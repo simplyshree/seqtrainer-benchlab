@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SeqTrainer BenchLab</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="mark">ST</span>
+        <div>
+          <strong>SeqTrainer</strong>
+          <span>BenchLab</span>
+        </div>
+      </div>
+      <nav>
+        <button class="nav-button active" data-panel="dataset">Dataset</button>
+        <button class="nav-button" data-panel="preprocess">Preprocess</button>
+        <button class="nav-button" data-panel="benchmark">Benchmark</button>
+        <button class="nav-button" data-panel="results">Results</button>
+      </nav>
+      <div class="status">
+        <span id="health-dot"></span>
+        <span id="health-text">Checking service</span>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h1>DNA Benchmark Workbench</h1>
+          <p>Upload, preprocess, benchmark, and export reproducible sequence runs.</p>
+        </div>
+        <button id="refresh-runs" class="secondary">Refresh Runs</button>
+      </header>
+
+      <section id="panel-dataset" class="panel visible">
+        <div class="section-head">
+          <h2>Dataset</h2>
+          <span>CSV, TSV, FASTA, SBOL/XML</span>
+        </div>
+        <div class="grid two">
+          <form id="upload-form" class="surface">
+            <label class="drop-zone">
+              <input id="dataset-file" type="file" required />
+              <span>Choose dataset file</span>
+            </label>
+            <button type="submit">Upload Dataset</button>
+          </form>
+          <div class="surface">
+            <h3>Current Dataset</h3>
+            <dl id="dataset-meta" class="meta"></dl>
+          </div>
+        </div>
+        <div class="surface">
+          <h3>Preview</h3>
+          <div id="dataset-preview" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="panel-preprocess" class="panel">
+        <div class="section-head">
+          <h2>Preprocess</h2>
+          <span>Feature generation from current SeqTrainer kernels</span>
+        </div>
+        <div class="grid two">
+          <form id="preprocess-form" class="surface controls">
+            <label>Sequence Column <input id="sequence-col" value="sequence" /></label>
+            <label>K-mer Size <input id="kmer-size" type="number" min="1" max="6" value="4" /></label>
+            <label><input id="use-gc" type="checkbox" checked /> GC content</label>
+            <label><input id="use-kmers" type="checkbox" checked /> K-mer counts</label>
+            <label><input id="normalize-kmers" type="checkbox" checked /> Normalize k-mers</label>
+            <label><input id="use-one-hot" type="checkbox" /> One-hot encoding</label>
+            <label>One-hot Length <input id="sequence-length" type="number" min="20" max="1000" value="150" /></label>
+            <button type="submit">Preview Features</button>
+          </form>
+          <div class="surface">
+            <h3>Feature Summary</h3>
+            <div id="feature-summary" class="callout">No preprocessing preview yet.</div>
+          </div>
+        </div>
+        <div class="surface">
+          <h3>Feature Preview</h3>
+          <div id="feature-preview" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="panel-benchmark" class="panel">
+        <div class="section-head">
+          <h2>Benchmark</h2>
+          <span>Baseline regression models</span>
+        </div>
+        <form id="benchmark-form" class="surface controls wide">
+          <label>Target Column <input id="target-col" value="target" /></label>
+          <label>Test Size <input id="test-size" type="number" min="0.1" max="0.5" step="0.05" value="0.2" /></label>
+          <label>Random Seed <input id="random-seed" type="number" value="42" /></label>
+          <div class="model-list">
+            <label><input class="model-option" type="checkbox" value="linear_regression" checked /> Linear Regression</label>
+            <label><input class="model-option" type="checkbox" value="random_forest" checked /> Random Forest</label>
+            <label><input class="model-option" type="checkbox" value="gradient_boosting" /> Gradient Boosting</label>
+          </div>
+          <div class="planned">
+            <span>Planned</span>
+            <button type="button" disabled>DNABERT2</button>
+            <button type="button" disabled>CNN</button>
+            <button type="button" disabled>iPro-MP</button>
+            <button type="button" disabled>GNN</button>
+          </div>
+          <button type="submit">Run Benchmark</button>
+        </form>
+      </section>
+
+      <section id="panel-results" class="panel">
+        <div class="section-head">
+          <h2>Results</h2>
+          <span>Metrics, predictions, manifests</span>
+        </div>
+        <div class="grid two">
+          <div class="surface">
+            <h3>Runs</h3>
+            <div id="run-list" class="run-list"></div>
+          </div>
+          <div class="surface">
+            <h3>Metrics</h3>
+            <div id="metrics-table" class="table-wrap"></div>
+            <a id="export-link" class="export hidden" href="#">Export Run Bundle</a>
+          </div>
+        </div>
+        <div class="surface">
+          <h3>Predictions</h3>
+          <div id="predictions-table" class="table-wrap"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
