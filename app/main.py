@@ -35,6 +35,41 @@ MODEL_MAP = {
     "gradient_boosting": GradientBoostingRegressor,
 }
 
+SEQTRAINER_SOURCE = {
+    "repository": "SynBioDex/SeqTrainer",
+    "url": "https://github.com/SynBioDex/SeqTrainer",
+    "verified_main_commit": "5e9701d",
+    "verified_on": "2026-06-05",
+}
+
+CAPABILITIES = {
+    "source": SEQTRAINER_SOURCE,
+    "supported_formats": ["csv", "tsv", "txt", "fasta", "fa", "xml", "rdf", "sbol"],
+    "seqtrainer_functions": [
+        "dataset_builder.get_sequence_from_sbol",
+        "dataset_builder.find_possible_y_uris",
+        "dataset_builder.get_y_label",
+        "dataset_builder.build_dataset",
+        "preprocessing.one_hot_encode",
+        "preprocessing.pad_sequence",
+        "preprocessing.process_seqs",
+        "preprocessing.calc_gc",
+        "preprocessing.generate_kmer_counts",
+        "hpc.sklearn_tuning.MODEL_MAP",
+    ],
+    "live_models": [
+        {"id": "linear_regression", "name": "Linear Regression", "source": "sklearn_tuning lr"},
+        {"id": "random_forest", "name": "Random Forest", "source": "sklearn_tuning rfr"},
+        {"id": "gradient_boosting", "name": "Gradient Boosting", "source": "sklearn_tuning gbr"},
+    ],
+    "planned_models": [
+        {"id": "dnabert2", "name": "DNABERT2", "status": "notebook workflow in upstream"},
+        {"id": "gnn", "name": "SBOL GNN", "status": "experimental code in upstream"},
+        {"id": "cnn", "name": "CNN", "status": "future wrapper"},
+        {"id": "ipro_mp", "name": "iPro-MP", "status": "future integration"},
+    ],
+}
+
 
 class BenchmarkRequest(BaseModel):
     dataset_id: str
@@ -92,6 +127,11 @@ def on_startup() -> None:
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "seqtrainer-benchlab"}
+
+
+@app.get("/api/capabilities")
+def capabilities() -> dict[str, Any]:
+    return CAPABILITIES
 
 
 @app.post("/api/datasets")

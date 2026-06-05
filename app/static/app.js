@@ -6,7 +6,8 @@ const toast = document.querySelector("#toast");
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 4200);
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => toast.classList.add("hidden"), 4200);
 }
 
 async function api(path, options = {}) {
@@ -24,20 +25,45 @@ async function api(path, options = {}) {
   return response.json();
 }
 
+function setText(selector, value) {
+  const node = document.querySelector(selector);
+  if (node) node.textContent = value;
+}
+
+function goToPanel(panelName) {
+  document.querySelectorAll(".nav-button").forEach((item) => item.classList.toggle("active", item.dataset.panel === panelName));
+  document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("visible"));
+  document.querySelector(`#panel-${panelName}`).classList.add("visible");
+}
+
+async function withLoading(button, fn) {
+  if (!button) return fn();
+  try {
+    button.classList.add("loading");
+    button.disabled = true;
+    return await fn();
+  } finally {
+    button.classList.remove("loading");
+    button.disabled = false;
+  }
+}
+
 function renderMeta(target, payload) {
   target.innerHTML = "";
   Object.entries(payload).forEach(([key, value]) => {
     const dt = document.createElement("dt");
     const dd = document.createElement("dd");
-    dt.textContent = key;
+    dt.textContent = key.replaceAll("_", " ");
     dd.textContent = Array.isArray(value) ? value.join(", ") : String(value);
     target.append(dt, dd);
   });
 }
 
 function renderTable(target, rows) {
+  target.classList.remove("empty-state");
   if (!rows || rows.length === 0) {
-    target.innerHTML = "<p class=\"empty\">No rows.</p>";
+    target.classList.add("empty-state");
+    target.textContent = "No rows.";
     return;
   }
   const columns = Object.keys(rows[0]);
@@ -55,7 +81,8 @@ function renderTable(target, rows) {
     const tr = document.createElement("tr");
     columns.forEach((column) => {
       const td = document.createElement("td");
-      td.textContent = row[column] ?? "";
+      const value = row[column];
+      td.textContent = typeof value === "number" ? Number(value.toFixed(6)).toString() : value ?? "";
       tr.append(td);
     });
     tbody.append(tr);
@@ -76,14 +103,54 @@ function preprocessingConfig() {
   };
 }
 
+function updateDatasetState(dataset) {
+  setText("#state-dataset", dataset.original_name);
+  setText("#dataset-rows", dataset.row_count);
+  setText("#dataset-cols", dataset.columns.length);
+  setText("#dataset-format", dataset.source_format.replace(".", "").toUpperCase());
+  setText("#preview-count", `${dataset.row_count} rows, ${dataset.columns.length} columns`);
+}
+
+function renderCapabilities(data) {
+  if (data.source) {
+    setText("#source-commit", `main ${data.source.verified_main_commit}, checked ${data.source.verified_on}`);
+  }
+
+  const capabilityList = document.querySelector("#capability-list");
+  if (capabilityList) {
+    capabilityList.innerHTML = "";
+    (data.seqtrainer_functions || []).slice(0, 6).forEach((name) => {
+      const item = document.createElement("div");
+      item.textContent = name;
+      capabilityList.append(item);
+    });
+  }
+
+  const planned = document.querySelector("#planned-models");
+  if (planned) {
+    planned.innerHTML = "";
+    (data.planned_models || []).forEach((model) => {
+      const item = document.createElement("div");
+      item.className = "planned-chip";
+      item.innerHTML = `<strong>${model.name}</strong><span>${model.status}</span>`;
+      planned.append(item);
+    });
+  }
+}
+
 document.querySelectorAll(".nav-button").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".nav-button").forEach((item) => item.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("visible"));
-    button.classList.add("active");
-    document.querySelector(`#panel-${button.dataset.panel}`).classList.add("visible");
-  });
+  button.addEventListener("click", () => goToPanel(button.dataset.panel));
 });
+
+const fileInputEl = document.querySelector("#dataset-file");
+const fileInfoEl = document.querySelector("#file-info");
+
+if (fileInputEl && fileInfoEl) {
+  fileInputEl.addEventListener("change", () => {
+    const file = fileInputEl.files && fileInputEl.files[0];
+    fileInfoEl.textContent = file ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)` : "No file chosen";
+  });
+}
 
 async function checkHealth() {
   const dot = document.querySelector("#health-dot");
@@ -101,18 +168,23 @@ async function checkHealth() {
 document.querySelector("#upload-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const fileInput = document.querySelector("#dataset-file");
-  if (!fileInput.files.length) return;
-  const body = new FormData();
-  body.append("file", fileInput.files[0]);
-  try {
-    const data = await api("/api/datasets", { method: "POST", body });
-    currentDatasetId = data.dataset.dataset_id;
-    renderMeta(document.querySelector("#dataset-meta"), data.dataset);
-    renderTable(document.querySelector("#dataset-preview"), data.preview);
-    showToast("Dataset uploaded.");
-  } catch (error) {
-    showToast(error.message);
-  }
+  if (!fileInput.files.length) return showToast("No file selected.");
+  const submitBtn = document.querySelector("#upload-form button[type='submit']");
+  await withLoading(submitBtn, async () => {
+    const body = new FormData();
+    body.append("file", fileInput.files[0]);
+    try {
+      const data = await api("/api/datasets", { method: "POST", body });
+      currentDatasetId = data.dataset.dataset_id;
+      renderMeta(document.querySelector("#dataset-meta"), data.dataset);
+      renderTable(document.querySelector("#dataset-preview"), data.preview);
+      updateDatasetState(data.dataset);
+      showToast("Dataset uploaded.");
+      goToPanel("preprocess");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
 });
 
 document.querySelector("#preprocess-form").addEventListener("submit", async (event) => {
@@ -121,18 +193,24 @@ document.querySelector("#preprocess-form").addEventListener("submit", async (eve
     showToast("Upload a dataset first.");
     return;
   }
-  const body = new FormData();
-  body.append("sequence_col", document.querySelector("#sequence-col").value);
-  body.append("config", JSON.stringify(preprocessingConfig()));
-  try {
-    const data = await api(`/api/preprocess/${currentDatasetId}`, { method: "POST", body });
-    document.querySelector("#feature-summary").textContent =
-      `${data.row_count} rows, ${data.feature_count} features. Showing first ${data.columns.length} columns.`;
-    renderTable(document.querySelector("#feature-preview"), data.preview);
-    showToast("Feature preview ready.");
-  } catch (error) {
-    showToast(error.message);
-  }
+  const submitBtn = document.querySelector("#preprocess-form button[type='submit']");
+  await withLoading(submitBtn, async () => {
+    const body = new FormData();
+    body.append("sequence_col", document.querySelector("#sequence-col").value);
+    body.append("config", JSON.stringify(preprocessingConfig()));
+    try {
+      const data = await api(`/api/preprocess/${currentDatasetId}`, { method: "POST", body });
+      const summary = `${data.row_count} rows, ${data.feature_count} features. Showing first ${data.columns.length} columns.`;
+      document.querySelector("#feature-summary").textContent = summary;
+      setText("#state-features", `${data.feature_count} features`);
+      setText("#feature-count", `${data.feature_count} generated columns`);
+      renderTable(document.querySelector("#feature-preview"), data.preview);
+      showToast("Feature preview ready.");
+      goToPanel("benchmark");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
 });
 
 document.querySelector("#benchmark-form").addEventListener("submit", async (event) => {
@@ -141,31 +219,40 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
     showToast("Upload a dataset first.");
     return;
   }
-  const models = [...document.querySelectorAll(".model-option:checked")].map((item) => item.value);
-  const payload = {
-    dataset_id: currentDatasetId,
-    sequence_col: document.querySelector("#sequence-col").value,
-    target_col: document.querySelector("#target-col").value,
-    models,
-    preprocessing: preprocessingConfig(),
-    test_size: Number(document.querySelector("#test-size").value),
-    random_seed: Number(document.querySelector("#random-seed").value),
-  };
-  try {
-    const data = await api("/api/benchmarks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    currentRunId = data.run.run_id;
-    renderMetrics(data.metrics);
-    renderTable(document.querySelector("#predictions-table"), data.predictions);
-    setExportLink(currentRunId);
-    await loadRuns();
-    showToast("Benchmark complete.");
-  } catch (error) {
-    showToast(error.message);
-  }
+  const submitBtn = document.querySelector("#benchmark-form button[type='submit']");
+  await withLoading(submitBtn, async () => {
+    const models = [...document.querySelectorAll(".model-option:checked")].map((item) => item.value);
+    if (!models.length) {
+      showToast("Choose at least one runnable model.");
+      return;
+    }
+    const payload = {
+      dataset_id: currentDatasetId,
+      sequence_col: document.querySelector("#sequence-col").value,
+      target_col: document.querySelector("#target-col").value,
+      models,
+      preprocessing: preprocessingConfig(),
+      test_size: Number(document.querySelector("#test-size").value),
+      random_seed: Number(document.querySelector("#random-seed").value),
+    };
+    try {
+      const data = await api("/api/benchmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      currentRunId = data.run.run_id;
+      renderMetrics(data.metrics);
+      renderTable(document.querySelector("#predictions-table"), data.predictions);
+      setExportLink(currentRunId);
+      setText("#state-run", currentRunId.slice(0, 8));
+      await loadRuns();
+      showToast("Benchmark complete.");
+      goToPanel("results");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
 });
 
 function renderMetrics(metrics) {
@@ -183,10 +270,16 @@ async function loadRuns() {
   const data = await api("/api/runs");
   const list = document.querySelector("#run-list");
   list.innerHTML = "";
+  if (!data.runs.length) {
+    list.classList.add("empty-state");
+    list.textContent = "No runs yet.";
+    return;
+  }
+  list.classList.remove("empty-state");
   data.runs.slice().reverse().forEach((run) => {
     const button = document.createElement("button");
     button.className = "run-item";
-    button.textContent = `${run.created_at} | ${run.run_id}`;
+    button.innerHTML = `<strong>${run.run_id.slice(0, 8)}</strong><span>${new Date(run.created_at).toLocaleString()}</span>`;
     button.addEventListener("click", () => loadRun(run.run_id));
     list.append(button);
   });
@@ -198,6 +291,7 @@ async function loadRun(runId) {
   renderMetrics(data.metrics);
   renderTable(document.querySelector("#predictions-table"), data.predictions);
   setExportLink(runId);
+  setText("#state-run", runId.slice(0, 8));
 }
 
 document.querySelector("#refresh-runs").addEventListener("click", () => {
@@ -205,4 +299,5 @@ document.querySelector("#refresh-runs").addEventListener("click", () => {
 });
 
 checkHealth();
+api("/api/capabilities").then(renderCapabilities).catch(() => {});
 loadRuns().catch(() => {});

@@ -15,12 +15,17 @@
           <span>BenchLab</span>
         </div>
       </div>
-      <nav>
-        <button class="nav-button active" data-panel="dataset">Dataset</button>
-        <button class="nav-button" data-panel="preprocess">Preprocess</button>
-        <button class="nav-button" data-panel="benchmark">Benchmark</button>
-        <button class="nav-button" data-panel="results">Results</button>
+      <nav aria-label="Workflow">
+        <button class="nav-button active" data-panel="dataset"><span>1</span> Dataset</button>
+        <button class="nav-button" data-panel="preprocess"><span>2</span> Preprocess</button>
+        <button class="nav-button" data-panel="benchmark"><span>3</span> Benchmark</button>
+        <button class="nav-button" data-panel="results"><span>4</span> Results</button>
       </nav>
+      <div class="source-box">
+        <span>Upstream</span>
+        <a href="https://github.com/SynBioDex/SeqTrainer" target="_blank" rel="noreferrer">SynBioDex/SeqTrainer</a>
+        <small id="source-commit">main verified</small>
+      </div>
       <div class="status">
         <span id="health-dot"></span>
         <span id="health-text">Checking service</span>
@@ -30,83 +35,138 @@
     <main>
       <header class="topbar">
         <div>
-          <h1>DNA Benchmark Workbench</h1>
-          <p>Upload, preprocess, benchmark, and export reproducible sequence runs.</p>
+          <div class="eyebrow">Reproducible DNA sequence benchmarking</div>
+          <h1>SeqTrainer BenchLab</h1>
+          <p>Upload sequence datasets, build SeqTrainer features, run baseline regressors, and export complete manifests.</p>
         </div>
-        <button id="refresh-runs" class="secondary">Refresh Runs</button>
+        <div class="top-actions">
+          <button id="refresh-runs" class="secondary">Refresh Runs</button>
+          <a class="repo-link" href="https://github.com/SynBioDex/SeqTrainer" target="_blank" rel="noreferrer">SeqTrainer Source</a>
+        </div>
       </header>
+
+      <section class="summary-strip" aria-label="Current state">
+        <div>
+          <span>Dataset</span>
+          <strong id="state-dataset">None loaded</strong>
+        </div>
+        <div>
+          <span>Features</span>
+          <strong id="state-features">Not previewed</strong>
+        </div>
+        <div>
+          <span>Last Run</span>
+          <strong id="state-run">No run yet</strong>
+        </div>
+      </section>
 
       <section id="panel-dataset" class="panel visible">
         <div class="section-head">
-          <h2>Dataset</h2>
-          <span>CSV, TSV, FASTA, SBOL/XML</span>
+          <div>
+            <h2>Dataset</h2>
+            <p>Use tabular DNA sequence files, FASTA records, or SBOL/XML sequence designs.</p>
+          </div>
+          <span class="format-list">CSV TSV FASTA SBOL/XML</span>
         </div>
         <div class="grid two">
-          <form id="upload-form" class="surface">
-            <label class="drop-zone">
-              <input id="dataset-file" type="file" required />
-              <span>Choose dataset file</span>
+          <form id="upload-form" class="surface upload-panel">
+            <label class="drop-zone" for="dataset-file" tabindex="0">
+              <input id="dataset-file" type="file" accept=".csv,.tsv,.txt,.fa,.fasta,.xml,.rdf,.sbol" required />
+              <span class="upload-icon">+</span>
+              <div class="drop-inner">
+                <strong>Choose dataset file</strong>
+                <small>Sequence column is auto-previewed after upload.</small>
+              </div>
             </label>
+            <div class="file-info" id="file-info">No file chosen</div>
             <button type="submit">Upload Dataset</button>
           </form>
-          <div class="surface">
-            <h3>Current Dataset</h3>
-            <dl id="dataset-meta" class="meta"></dl>
+          <div class="surface stack">
+            <div>
+              <h3>Current Dataset</h3>
+              <dl id="dataset-meta" class="meta"></dl>
+            </div>
+            <div class="metric-row">
+              <div><span>Rows</span><strong id="dataset-rows">-</strong></div>
+              <div><span>Columns</span><strong id="dataset-cols">-</strong></div>
+              <div><span>Format</span><strong id="dataset-format">-</strong></div>
+            </div>
           </div>
         </div>
         <div class="surface">
-          <h3>Preview</h3>
-          <div id="dataset-preview" class="table-wrap"></div>
+          <div class="table-heading">
+            <h3>Dataset Preview</h3>
+            <span id="preview-count">Waiting for upload</span>
+          </div>
+          <div id="dataset-preview" class="table-wrap empty-state">No dataset loaded.</div>
         </div>
       </section>
 
       <section id="panel-preprocess" class="panel">
         <div class="section-head">
-          <h2>Preprocess</h2>
-          <span>Feature generation from current SeqTrainer kernels</span>
+          <div>
+            <h2>Preprocess</h2>
+            <p>Feature generation mirrors the current SeqTrainer preprocessing module.</p>
+          </div>
+          <span class="format-list">GC K-mer One-hot</span>
         </div>
         <div class="grid two">
           <form id="preprocess-form" class="surface controls">
-            <label>Sequence Column <input id="sequence-col" value="sequence" /></label>
-            <label>K-mer Size <input id="kmer-size" type="number" min="1" max="6" value="4" /></label>
-            <label><input id="use-gc" type="checkbox" checked /> GC content</label>
-            <label><input id="use-kmers" type="checkbox" checked /> K-mer counts</label>
-            <label><input id="normalize-kmers" type="checkbox" checked /> Normalize k-mers</label>
-            <label><input id="use-one-hot" type="checkbox" /> One-hot encoding</label>
-            <label>One-hot Length <input id="sequence-length" type="number" min="20" max="1000" value="150" /></label>
+            <div class="control-grid">
+              <label>Sequence Column <input id="sequence-col" value="sequence" /></label>
+              <label>K-mer Size <input id="kmer-size" type="number" min="1" max="6" value="4" /></label>
+              <label>One-hot Length <input id="sequence-length" type="number" min="20" max="1000" value="150" /></label>
+            </div>
+            <div class="option-grid">
+              <label class="option-card"><input id="use-gc" type="checkbox" checked /><span><strong>GC content</strong><small>SeqTrainer calc_gc</small></span></label>
+              <label class="option-card"><input id="use-kmers" type="checkbox" checked /><span><strong>K-mer counts</strong><small>SeqTrainer generate_kmer_counts</small></span></label>
+              <label class="option-card"><input id="normalize-kmers" type="checkbox" checked /><span><strong>Normalize k-mers</strong><small>Relative frequencies</small></span></label>
+              <label class="option-card"><input id="use-one-hot" type="checkbox" /><span><strong>One-hot encoding</strong><small>SeqTrainer one_hot_encode</small></span></label>
+            </div>
             <button type="submit">Preview Features</button>
           </form>
-          <div class="surface">
-            <h3>Feature Summary</h3>
-            <div id="feature-summary" class="callout">No preprocessing preview yet.</div>
+          <div class="surface stack">
+            <div>
+              <h3>Feature Summary</h3>
+              <div id="feature-summary" class="callout">No preprocessing preview yet.</div>
+            </div>
+            <div id="capability-list" class="capability-list"></div>
           </div>
         </div>
         <div class="surface">
-          <h3>Feature Preview</h3>
-          <div id="feature-preview" class="table-wrap"></div>
+          <div class="table-heading">
+            <h3>Feature Preview</h3>
+            <span id="feature-count">No feature matrix</span>
+          </div>
+          <div id="feature-preview" class="table-wrap empty-state">Run preprocessing preview to inspect generated columns.</div>
         </div>
       </section>
 
       <section id="panel-benchmark" class="panel">
         <div class="section-head">
-          <h2>Benchmark</h2>
-          <span>Baseline regression models</span>
+          <div>
+            <h2>Benchmark</h2>
+            <p>Live models are the baseline regressors present in current SeqTrainer workflows.</p>
+          </div>
+          <span class="format-list">Regression MVP</span>
         </div>
         <form id="benchmark-form" class="surface controls wide">
-          <label>Target Column <input id="target-col" value="target" /></label>
-          <label>Test Size <input id="test-size" type="number" min="0.1" max="0.5" step="0.05" value="0.2" /></label>
-          <label>Random Seed <input id="random-seed" type="number" value="42" /></label>
-          <div class="model-list">
-            <label><input class="model-option" type="checkbox" value="linear_regression" checked /> Linear Regression</label>
-            <label><input class="model-option" type="checkbox" value="random_forest" checked /> Random Forest</label>
-            <label><input class="model-option" type="checkbox" value="gradient_boosting" /> Gradient Boosting</label>
+          <div class="control-grid">
+            <label>Target Column <input id="target-col" value="target" /></label>
+            <label>Test Size <input id="test-size" type="number" min="0.1" max="0.5" step="0.05" value="0.2" /></label>
+            <label>Random Seed <input id="random-seed" type="number" value="42" /></label>
           </div>
-          <div class="planned">
-            <span>Planned</span>
-            <button type="button" disabled>DNABERT2</button>
-            <button type="button" disabled>CNN</button>
-            <button type="button" disabled>iPro-MP</button>
-            <button type="button" disabled>GNN</button>
+          <div class="model-section">
+            <h3>Runnable Models</h3>
+            <div id="live-models" class="model-list">
+              <label class="model-card"><input class="model-option" type="checkbox" value="linear_regression" checked /><span><strong>Linear Regression</strong><small>sklearn_tuning lr</small></span></label>
+              <label class="model-card"><input class="model-option" type="checkbox" value="random_forest" checked /><span><strong>Random Forest</strong><small>sklearn_tuning rfr</small></span></label>
+              <label class="model-card"><input class="model-option" type="checkbox" value="gradient_boosting" /><span><strong>Gradient Boosting</strong><small>sklearn_tuning gbr</small></span></label>
+            </div>
+          </div>
+          <div class="model-section">
+            <h3>Planned Integrations</h3>
+            <div id="planned-models" class="planned-models"></div>
           </div>
           <button type="submit">Run Benchmark</button>
         </form>
@@ -114,28 +174,33 @@
 
       <section id="panel-results" class="panel">
         <div class="section-head">
-          <h2>Results</h2>
-          <span>Metrics, predictions, manifests</span>
+          <div>
+            <h2>Results</h2>
+            <p>Review metrics, predictions, and reproducibility artifacts for each benchmark run.</p>
+          </div>
+          <a id="export-link" class="export hidden" href="#">Export Run Bundle</a>
         </div>
         <div class="grid two">
           <div class="surface">
             <h3>Runs</h3>
-            <div id="run-list" class="run-list"></div>
+            <div id="run-list" class="run-list empty-state">No runs yet.</div>
           </div>
           <div class="surface">
             <h3>Metrics</h3>
-            <div id="metrics-table" class="table-wrap"></div>
-            <a id="export-link" class="export hidden" href="#">Export Run Bundle</a>
+            <div id="metrics-table" class="table-wrap empty-state">No metrics yet.</div>
           </div>
         </div>
         <div class="surface">
-          <h3>Predictions</h3>
-          <div id="predictions-table" class="table-wrap"></div>
+          <div class="table-heading">
+            <h3>Predictions</h3>
+            <span>Actual vs predicted values</span>
+          </div>
+          <div id="predictions-table" class="table-wrap empty-state">No predictions yet.</div>
         </div>
       </section>
     </main>
 
-    <div id="toast" class="toast hidden"></div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
     <script src="/app.js"></script>
   </body>
 </html>
