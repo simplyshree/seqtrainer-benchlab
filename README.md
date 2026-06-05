@@ -18,6 +18,13 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
   - Linear Regression
   - Random Forest
   - Gradient Boosting
+- Show train/test split size, seed, selected columns, preprocessing config, and data cleanup status after each run
+- For 0/1 labels, report thresholded classification metrics alongside the current-main regression baselines:
+  - Accuracy
+  - Precision
+  - Recall
+  - F1
+  - Confusion counts
 - Export:
   - metrics
   - predictions
@@ -31,6 +38,11 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
 These are not selectable in the web app until the upstream project exposes stable APIs.
 The current upstream repository includes DNABERT2 notebooks and experimental GNN code, but
 the web app only enables the baseline sklearn models from the main branch scripts.
+
+For binary label datasets, such as `label` values of `0` and `1`, BenchLab still trains the
+current-main sklearn regression baselines. It then applies a `0.5` prediction threshold to
+report classification-style metrics. This keeps the app faithful to the available SeqTrainer
+main-branch model code while making promoter/non-promoter results easier to read.
 
 ## SeqTrainer Integration
 
@@ -70,6 +82,19 @@ This repo can be hosted as a Python web service on Render, Railway, Fly.io, Azur
 or any Docker-capable host.
 
 Recommended runtime: Python 3.11.
+
+Render:
+
+1. Push this repository to GitHub.
+2. In Render, create a new Blueprint or Web Service from the GitHub repository.
+3. Use:
+   - Build command: `pip install -r requirements.txt`
+   - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Runtime: Python 3.11
+4. Add optional email environment variables if SMTP delivery is needed.
+5. For production, add persistent storage or object storage for run artifacts. The app deletes
+   uploaded source datasets after each successful benchmark by default, but exported run
+   artifacts still live under `storage/runs`.
 
 Docker:
 

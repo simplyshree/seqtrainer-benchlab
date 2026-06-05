@@ -239,6 +239,7 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
       });
       currentRunId = data.run.run_id;
       renderMetrics(data.metrics);
+      renderRunDetails(data);
       renderTable(document.querySelector("#predictions-table"), data.predictions);
       setExportLink(currentRunId);
       setText("#state-run", currentRunId.slice(0, 8));
@@ -254,6 +255,35 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
 function renderMetrics(metrics) {
   const rows = Object.entries(metrics).map(([model, values]) => ({ model, ...values }));
   renderTable(document.querySelector("#metrics-table"), rows);
+}
+
+function renderRunDetails(payload) {
+  const run = payload.run || {};
+  const dataset = payload.dataset || {};
+  const training = payload.training_config || {};
+  const preprocessing = payload.preprocessing_config || {};
+  const targetKind = run.target_kind === "binary_numeric_label" ? "Binary 0/1 label" : "Numeric regression target";
+  const cleanup = run.source_dataset_removed_after_run || payload.dataset_removed ? "Uploaded source file deleted after run" : "Uploaded source file retained";
+  const preprocessingText =
+    Object.entries(preprocessing)
+      .filter(([, value]) => value !== false && value !== null && value !== undefined)
+      .map(([key, value]) => `${key}=${value}`)
+      .join(", ") || "none";
+
+  renderMeta(document.querySelector("#run-details"), {
+    run_id: run.run_id || currentRunId || "none",
+    created_at: run.created_at ? new Date(run.created_at).toLocaleString() : "unknown",
+    dataset: dataset.original_name || run.dataset_id || "unknown",
+    sequence_column: training.sequence_col || "unknown",
+    target_column: training.target_col || "unknown",
+    target_kind: targetKind,
+    models: training.models || [],
+    split: `${training.train_rows ?? run.train_rows ?? "-"} train / ${training.test_rows ?? run.test_rows ?? "-"} test`,
+    rows_used: training.rows_used ?? run.rows_used ?? "-",
+    random_seed: training.random_seed ?? "-",
+    preprocessing: preprocessingText,
+    data_cleanup: cleanup,
+  });
 }
 
 function setExportLink(runId) {
@@ -285,6 +315,7 @@ async function loadRun(runId) {
   const data = await api(`/api/runs/${runId}`);
   currentRunId = runId;
   renderMetrics(data.metrics);
+  renderRunDetails(data);
   renderTable(document.querySelector("#predictions-table"), data.predictions);
   setExportLink(runId);
   setText("#state-run", runId.slice(0, 8));
