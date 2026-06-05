@@ -23,6 +23,7 @@ body {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  overflow-x: hidden;
   background: var(--canvas);
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -75,6 +76,8 @@ button:disabled {
 
 .sidebar {
   min-height: 100vh;
+  width: 260px;
+  min-width: 260px;
   padding: 22px 16px;
   background: var(--sidebar);
   color: white;
@@ -178,6 +181,7 @@ nav {
 
 main {
   min-width: 0;
+  overflow: hidden;
   padding: 24px;
 }
 
@@ -263,6 +267,7 @@ p,
 .panel.visible {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .section-head {
@@ -287,6 +292,11 @@ p,
 .grid {
   display: grid;
   gap: 16px;
+  min-width: 0;
+}
+
+.grid > * {
+  min-width: 0;
 }
 
 .grid.two {
@@ -294,6 +304,7 @@ p,
 }
 
 .surface {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -505,9 +516,35 @@ p,
   font-size: 13px;
 }
 
+.heading-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.preview-toggle {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: auto;
   max-height: 420px;
+  transition: max-height 0.18s ease;
+}
+
+.table-wrap.preview-collapsed {
+  max-height: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border-left: 0;
 }
 
 table {
@@ -656,5 +693,14 @@ th {
   .table-heading {
     align-items: start;
     flex-direction: column;
+  }
+
+  .sidebar {
+    width: auto;
+    min-width: 0;
+  }
+
+  .heading-actions {
+    justify-content: flex-start;
   }
 }

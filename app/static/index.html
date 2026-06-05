@@ -96,7 +96,10 @@
         <div class="surface">
           <div class="table-heading">
             <h3>Dataset Preview</h3>
-            <span id="preview-count">Waiting for upload</span>
+            <div class="heading-actions">
+              <span id="preview-count">Waiting for upload</span>
+              <button type="button" class="secondary preview-toggle" data-preview-target="dataset-preview">Show Preview</button>
+            </div>
           </div>
           <div id="dataset-preview" class="table-wrap empty-state">No dataset loaded.</div>
         </div>
@@ -136,7 +139,10 @@
         <div class="surface">
           <div class="table-heading">
             <h3>Feature Preview</h3>
-            <span id="feature-count">No feature matrix</span>
+            <div class="heading-actions">
+              <span id="feature-count">No feature matrix</span>
+              <button type="button" class="secondary preview-toggle" data-preview-target="feature-preview">Show Preview</button>
+            </div>
           </div>
           <div id="feature-preview" class="table-wrap empty-state">Run preprocessing preview to inspect generated columns.</div>
         </div>
@@ -201,7 +207,10 @@
         <div class="surface">
           <div class="table-heading">
             <h3>Predictions</h3>
-            <span>Actual vs predicted values</span>
+            <div class="heading-actions">
+              <span>Actual vs predicted values</span>
+              <button type="button" class="secondary preview-toggle" data-preview-target="predictions-table">Show Predictions</button>
+            </div>
           </div>
           <div id="predictions-table" class="table-wrap empty-state">No predictions yet.</div>
         </div>

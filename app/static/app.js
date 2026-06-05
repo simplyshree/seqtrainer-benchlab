@@ -2,6 +2,11 @@ let currentDatasetId = null;
 let currentRunId = null;
 
 const toast = document.querySelector("#toast");
+const previewLabels = {
+  "dataset-preview": ["Show Preview", "Hide Preview"],
+  "feature-preview": ["Show Preview", "Hide Preview"],
+  "predictions-table": ["Show Predictions", "Hide Predictions"],
+};
 
 function showToast(message) {
   toast.textContent = message;
@@ -61,6 +66,7 @@ function renderMeta(target, payload) {
 
 function renderTable(target, rows) {
   target.classList.remove("empty-state");
+  target.classList.remove("preview-collapsed");
   if (!rows || rows.length === 0) {
     target.classList.add("empty-state");
     target.textContent = "No rows.";
@@ -90,6 +96,32 @@ function renderTable(target, rows) {
   table.append(thead, tbody);
   target.innerHTML = "";
   target.append(table);
+}
+
+function previewButton(targetId) {
+  return document.querySelector(`.preview-toggle[data-preview-target="${targetId}"]`);
+}
+
+function setPreviewExpanded(targetId, expanded) {
+  const target = document.querySelector(`#${targetId}`);
+  const button = previewButton(targetId);
+  if (!target || !button) return;
+
+  const hasRows = !target.classList.contains("empty-state") && target.querySelector("table");
+  button.disabled = !hasRows;
+  if (!hasRows) {
+    button.textContent = previewLabels[targetId]?.[0] || "Show";
+    target.classList.remove("preview-collapsed");
+    return;
+  }
+
+  target.classList.toggle("preview-collapsed", !expanded);
+  button.textContent = previewLabels[targetId]?.[expanded ? 1 : 0] || (expanded ? "Hide" : "Show");
+}
+
+function renderPreviewTable(target, rows) {
+  renderTable(target, rows);
+  setPreviewExpanded(target.id, false);
 }
 
 function preprocessingConfig() {
@@ -173,7 +205,7 @@ document.querySelector("#upload-form").addEventListener("submit", async (event) 
       const data = await api("/api/datasets", { method: "POST", body });
       currentDatasetId = data.dataset.dataset_id;
       renderMeta(document.querySelector("#dataset-meta"), data.dataset);
-      renderTable(document.querySelector("#dataset-preview"), data.preview);
+      renderPreviewTable(document.querySelector("#dataset-preview"), data.preview);
       updateDatasetState(data.dataset);
       showToast("Dataset uploaded.");
       goToPanel("preprocess");
@@ -200,7 +232,7 @@ document.querySelector("#preprocess-form").addEventListener("submit", async (eve
       document.querySelector("#feature-summary").textContent = summary;
       setText("#state-features", `${data.feature_count} features`);
       setText("#feature-count", `${data.feature_count} generated columns`);
-      renderTable(document.querySelector("#feature-preview"), data.preview);
+      renderPreviewTable(document.querySelector("#feature-preview"), data.preview);
       showToast("Feature preview ready.");
       goToPanel("benchmark");
     } catch (error) {
@@ -240,7 +272,7 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
       currentRunId = data.run.run_id;
       renderMetrics(data.metrics);
       renderRunDetails(data);
-      renderTable(document.querySelector("#predictions-table"), data.predictions);
+      renderPreviewTable(document.querySelector("#predictions-table"), data.predictions);
       setExportLink(currentRunId);
       setText("#state-run", currentRunId.slice(0, 8));
       await loadRuns();
@@ -316,13 +348,22 @@ async function loadRun(runId) {
   currentRunId = runId;
   renderMetrics(data.metrics);
   renderRunDetails(data);
-  renderTable(document.querySelector("#predictions-table"), data.predictions);
+  renderPreviewTable(document.querySelector("#predictions-table"), data.predictions);
   setExportLink(runId);
   setText("#state-run", runId.slice(0, 8));
 }
 
 document.querySelector("#refresh-runs").addEventListener("click", () => {
   loadRuns().catch((error) => showToast(error.message));
+});
+
+document.querySelectorAll(".preview-toggle").forEach((button) => {
+  setPreviewExpanded(button.dataset.previewTarget, true);
+  button.addEventListener("click", () => {
+    const target = document.querySelector(`#${button.dataset.previewTarget}`);
+    if (!target || target.classList.contains("empty-state")) return;
+    setPreviewExpanded(button.dataset.previewTarget, target.classList.contains("preview-collapsed"));
+  });
 });
 
 document.querySelector("#email-form").addEventListener("submit", async (event) => {
