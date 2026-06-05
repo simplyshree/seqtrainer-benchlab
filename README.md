@@ -101,6 +101,23 @@ Every run writes artifacts to `storage/runs/<run_id>`:
 - `preprocessing_config.json`
 - `training_config.json`
 
+## Email Results
+
+The Results screen can email a run summary and export link.
+
+For hosted SMTP delivery, configure these environment variables:
+
+```text
+SMTP_HOST
+SMTP_PORT
+SMTP_USERNAME
+SMTP_PASSWORD
+SMTP_FROM
+SMTP_TLS=true
+```
+
+If SMTP is not configured, the app opens a prefilled email draft using the user's mail app.
+
 ## Notes
 
 This branch deliberately avoids notebooks and hardcoded research paths. The first goal is a

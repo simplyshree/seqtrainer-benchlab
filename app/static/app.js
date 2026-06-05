@@ -294,6 +294,35 @@ document.querySelector("#refresh-runs").addEventListener("click", () => {
   loadRuns().catch((error) => showToast(error.message));
 });
 
+document.querySelector("#email-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!currentRunId) {
+    showToast("Run a benchmark or select a run first.");
+    return;
+  }
+  const email = document.querySelector("#email-address").value.trim();
+  if (!email) {
+    showToast("Enter an email address.");
+    return;
+  }
+  const submitBtn = document.querySelector("#email-form button[type='submit']");
+  await withLoading(submitBtn, async () => {
+    try {
+      const data = await api(`/api/runs/${currentRunId}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (data.mode === "mailto" && data.mailto) {
+        window.location.href = data.mailto;
+      }
+      showToast(data.message || "Email prepared.");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+});
+
 checkHealth();
 api("/api/capabilities").then(renderCapabilities).catch(() => {});
 loadRuns().catch(() => {});

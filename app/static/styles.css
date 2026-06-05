@@ -413,7 +413,8 @@ p,
 }
 
 .controls input[type="number"],
-.controls input:not([type]) {
+.controls input:not([type]),
+.email-form input {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -567,6 +568,27 @@ th {
   background: var(--blue);
 }
 
+.email-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.email-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.email-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .hidden {
   display: none !important;
 }
@@ -624,7 +646,8 @@ th {
   .control-grid,
   .option-grid,
   .model-list,
-  .planned-models {
+  .planned-models,
+  .email-form {
     grid-template-columns: 1fr;
   }
 

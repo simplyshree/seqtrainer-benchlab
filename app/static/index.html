@@ -181,9 +181,14 @@
             <h3>Runs</h3>
             <div id="run-list" class="run-list empty-state">No runs yet.</div>
           </div>
-          <div class="surface">
+          <div class="surface stack">
             <h3>Metrics</h3>
             <div id="metrics-table" class="table-wrap empty-state">No metrics yet.</div>
+            <form id="email-form" class="email-form">
+              <label>Email results to yourself <input id="email-address" type="email" placeholder="name@example.com" /></label>
+              <button type="submit" class="secondary">Email Results</button>
+            </form>
+            <p class="email-note">If SMTP is not configured, BenchLab opens a prefilled email draft with the run summary and export link.</p>
           </div>
         </div>
         <div class="surface">
