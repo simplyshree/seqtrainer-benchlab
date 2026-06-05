@@ -31,6 +31,7 @@ REPO_ROOT = APP_ROOT.parent
 STORAGE_ROOT = Path(os.getenv("SEQTRAINER_STORAGE", REPO_ROOT / "storage"))
 DATASETS_ROOT = STORAGE_ROOT / "datasets"
 RUNS_ROOT = STORAGE_ROOT / "runs"
+DELETE_DATASETS_AFTER_RUN = os.getenv("DELETE_DATASETS_AFTER_RUN", "true").lower() not in {"0", "false", "no"}
 
 MODEL_MAP = {
     "linear_regression": LinearRegression,
@@ -373,7 +374,19 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     write_json(folder / "training_config.json", training_config)
     write_json(folder / "run_manifest.json", run_manifest)
 
-    return {"run": run_manifest, "metrics": metrics, "predictions": predictions_df.head(50).round(6).to_dict(orient="records")}
+    dataset_removed = False
+    if DELETE_DATASETS_AFTER_RUN:
+        shutil.rmtree(dataset_dir(request.dataset_id), ignore_errors=True)
+        dataset_removed = True
+        run_manifest["source_dataset_removed_after_run"] = True
+        write_json(folder / "run_manifest.json", run_manifest)
+
+    return {
+        "run": run_manifest,
+        "metrics": metrics,
+        "predictions": predictions_df.head(50).round(6).to_dict(orient="records"),
+        "dataset_removed": dataset_removed,
+    }
 
 
 @app.get("/api/runs")

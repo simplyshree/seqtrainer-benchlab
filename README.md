@@ -101,6 +101,14 @@ Every run writes artifacts to `storage/runs/<run_id>`:
 - `preprocessing_config.json`
 - `training_config.json`
 
+Uploaded source datasets are deleted automatically after a successful benchmark run by default.
+The run keeps the dataset manifest, metrics, predictions, and configs, but not the uploaded
+raw dataset file. To keep uploaded datasets during development, set:
+
+```text
+DELETE_DATASETS_AFTER_RUN=false
+```
+
 ## Email Results
 
 The Results screen can email a run summary and export link.

@@ -243,7 +243,7 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
       setExportLink(currentRunId);
       setText("#state-run", currentRunId.slice(0, 8));
       await loadRuns();
-      showToast("Benchmark complete.");
+      showToast(data.dataset_removed ? "Benchmark complete. Uploaded dataset was deleted after run." : "Benchmark complete.");
       goToPanel("results");
     } catch (error) {
       showToast(error.message);
