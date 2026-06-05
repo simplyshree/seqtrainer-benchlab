@@ -28,12 +28,9 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
 
 ## Future Model Slots
 
-These are shown as planned integrations, not enabled in the MVP:
-
-- DNABERT2
-- CNN sequence model
-- iPro-MP
-- GNN over SBOL graphs
+These are not selectable in the web app until the upstream project exposes stable APIs.
+The current upstream repository includes DNABERT2 notebooks and experimental GNN code, but
+the web app only enables the baseline sklearn models from the main branch scripts.
 
 ## SeqTrainer Integration
 
@@ -86,7 +83,7 @@ docker run -p 8000:8000 seqtrainer-benchlab
 CSV/TSV files should contain:
 
 - one sequence column
-- optional target column for benchmark runs
+- optional numeric target column for benchmark runs, such as `target`, `label`, `y`, or `expression`
 - optional ID column
 
 FASTA/FA files create sequence-only datasets.

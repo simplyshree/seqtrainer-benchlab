@@ -37,7 +37,7 @@
         <div>
           <div class="eyebrow">Reproducible DNA sequence benchmarking</div>
           <h1>SeqTrainer BenchLab</h1>
-          <p>Upload sequence datasets, build SeqTrainer features, run baseline regressors, and export complete manifests.</p>
+          <p>Upload sequence datasets, build SeqTrainer features, run current-main baseline models, and export complete manifests.</p>
         </div>
         <div class="top-actions">
           <button id="refresh-runs" class="secondary">Refresh Runs</button>
@@ -146,7 +146,7 @@
         <div class="section-head">
           <div>
             <h2>Benchmark</h2>
-            <p>Live models are the baseline regressors present in current SeqTrainer workflows.</p>
+            <p>Only models exposed by the current SynBioDex/SeqTrainer main branch scripts are selectable here.</p>
           </div>
           <span class="format-list">Regression MVP</span>
         </div>
@@ -163,10 +163,6 @@
               <label class="model-card"><input class="model-option" type="checkbox" value="random_forest" checked /><span><strong>Random Forest</strong><small>sklearn_tuning rfr</small></span></label>
               <label class="model-card"><input class="model-option" type="checkbox" value="gradient_boosting" /><span><strong>Gradient Boosting</strong><small>sklearn_tuning gbr</small></span></label>
             </div>
-          </div>
-          <div class="model-section">
-            <h3>Planned Integrations</h3>
-            <div id="planned-models" class="planned-models"></div>
           </div>
           <button type="submit">Run Benchmark</button>
         </form>

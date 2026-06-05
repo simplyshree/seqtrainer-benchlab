@@ -109,6 +109,13 @@ function updateDatasetState(dataset) {
   setText("#dataset-cols", dataset.columns.length);
   setText("#dataset-format", dataset.source_format.replace(".", "").toUpperCase());
   setText("#preview-count", `${dataset.row_count} rows, ${dataset.columns.length} columns`);
+
+  if (dataset.suggested_sequence_col) {
+    document.querySelector("#sequence-col").value = dataset.suggested_sequence_col;
+  }
+  if (dataset.suggested_target_col) {
+    document.querySelector("#target-col").value = dataset.suggested_target_col;
+  }
 }
 
 function renderCapabilities(data) {
@@ -123,17 +130,6 @@ function renderCapabilities(data) {
       const item = document.createElement("div");
       item.textContent = name;
       capabilityList.append(item);
-    });
-  }
-
-  const planned = document.querySelector("#planned-models");
-  if (planned) {
-    planned.innerHTML = "";
-    (data.planned_models || []).forEach((model) => {
-      const item = document.createElement("div");
-      item.className = "planned-chip";
-      item.innerHTML = `<strong>${model.name}</strong><span>${model.status}</span>`;
-      planned.append(item);
     });
   }
 }

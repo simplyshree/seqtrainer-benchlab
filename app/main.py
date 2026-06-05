@@ -35,6 +35,8 @@ MODEL_MAP = {
     "gradient_boosting": GradientBoostingRegressor,
 }
 
+TARGET_COLUMN_CANDIDATES = ["target", "label", "y", "class", "promoter", "expression", "expn_med"]
+
 SEQTRAINER_SOURCE = {
     "repository": "SynBioDex/SeqTrainer",
     "url": "https://github.com/SynBioDex/SeqTrainer",
@@ -62,11 +64,9 @@ CAPABILITIES = {
         {"id": "random_forest", "name": "Random Forest", "source": "sklearn_tuning rfr"},
         {"id": "gradient_boosting", "name": "Gradient Boosting", "source": "sklearn_tuning gbr"},
     ],
-    "planned_models": [
-        {"id": "dnabert2", "name": "DNABERT2", "status": "notebook workflow in upstream"},
-        {"id": "gnn", "name": "SBOL GNN", "status": "experimental code in upstream"},
-        {"id": "cnn", "name": "CNN", "status": "future wrapper"},
-        {"id": "ipro_mp", "name": "iPro-MP", "status": "future integration"},
+    "upstream_research_assets": [
+        {"name": "DNABERT2 notebooks", "status": "present in upstream; not exposed as a stable web endpoint"},
+        {"name": "SBOL GNN experiment", "status": "present in upstream; not exposed as a stable web endpoint"},
     ],
 }
 
@@ -116,6 +116,14 @@ def load_dataset(dataset_id: str) -> tuple[pd.DataFrame, dict[str, Any]]:
     return df, manifest
 
 
+def infer_column(columns: list[str], candidates: list[str]) -> str | None:
+    normalized = {column.lower(): column for column in columns}
+    for candidate in candidates:
+        if candidate.lower() in normalized:
+            return normalized[candidate.lower()]
+    return None
+
+
 app = FastAPI(title="SeqTrainer BenchLab", version="0.1.0")
 
 
@@ -163,6 +171,8 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "created_at": utc_now(),
         "row_count": int(len(df)),
         "columns": list(df.columns),
+        "suggested_sequence_col": infer_column(list(df.columns), ["sequence", "seq", "variant", "dna"]),
+        "suggested_target_col": infer_column(list(df.columns), TARGET_COLUMN_CANDIDATES),
         "sha256": file_sha256(raw_path),
         "source_format": raw_path.suffix.lower(),
     }
@@ -207,8 +217,14 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     df, dataset_manifest = load_dataset(request.dataset_id)
     if request.sequence_col not in df.columns:
         raise HTTPException(status_code=400, detail=f"Column not found: {request.sequence_col}")
-    if request.target_col not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Target column not found: {request.target_col}")
+    target_col = request.target_col
+    if target_col not in df.columns:
+        inferred_target = infer_column(list(df.columns), TARGET_COLUMN_CANDIDATES)
+        if inferred_target:
+            target_col = inferred_target
+        else:
+            available = ", ".join(str(column) for column in df.columns)
+            raise HTTPException(status_code=400, detail=f"Target column not found: {request.target_col}. Available columns: {available}")
 
     selected_models = request.models or ["linear_regression"]
     unknown_models = [model for model in selected_models if model not in MODEL_MAP]
@@ -220,7 +236,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     folder.mkdir(parents=True, exist_ok=True)
 
     features = build_features(df, request.sequence_col, request.preprocessing)
-    target = pd.to_numeric(df[request.target_col], errors="coerce")
+    target = pd.to_numeric(df[target_col], errors="coerce")
     valid_mask = target.notna()
     features = features.loc[valid_mask].reset_index(drop=True)
     target = target.loc[valid_mask].reset_index(drop=True)
@@ -271,7 +287,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "test_size": request.test_size,
         "random_seed": request.random_seed,
         "sequence_col": request.sequence_col,
-        "target_col": request.target_col,
+        "target_col": target_col,
     }
     run_manifest = {
         "run_id": run_id,
