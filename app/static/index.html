@@ -82,6 +82,11 @@
             <button type="submit">Upload Dataset</button>
           </form>
           <div class="surface stack">
+            <div id="dataset-insight" class="analysis-card">
+              <span>Dataset Analysis</span>
+              <strong>Waiting for upload</strong>
+              <p>Upload a labeled dataset to analyze class balance and benchmark readiness.</p>
+            </div>
             <div>
               <h3>Current Dataset</h3>
               <dl id="dataset-meta" class="meta"></dl>
@@ -91,7 +96,6 @@
               <div><span>Columns</span><strong id="dataset-cols">-</strong></div>
               <div><span>Format</span><strong id="dataset-format">-</strong></div>
             </div>
-            <div id="dataset-insight" class="callout">Upload a labeled dataset to analyze class balance and benchmark readiness.</div>
           </div>
         </div>
         <div class="surface">
@@ -164,6 +168,28 @@
             <label>Random Seed <input id="random-seed" type="number" value="42" /></label>
           </div>
           <div id="benchmark-guidance" class="callout">Upload and analyze a dataset before running. Large hosted runs are capped to 1000 rows by default; export the JSON plan for Colab/HPC when the dataset is larger.</div>
+          <div class="protocol-preview" aria-label="Benchmark protocol preview">
+            <div class="protocol-card">
+              <span>Data Scope</span>
+              <strong id="preview-data-scope">No dataset loaded</strong>
+              <p id="preview-data-detail">Upload data to see hosted-run limits and class readiness.</p>
+            </div>
+            <div class="protocol-card">
+              <span>Split Plan</span>
+              <strong id="preview-split-plan">Fixed split</strong>
+              <p id="preview-split-detail">Train/validation/test with reproducible seed.</p>
+            </div>
+            <div class="protocol-card">
+              <span>Threshold Rule</span>
+              <strong id="preview-threshold-rule">User/literature</strong>
+              <p id="preview-threshold-detail">Shared policy; false positives treated as costly.</p>
+            </div>
+            <div class="protocol-card">
+              <span>Model Targets</span>
+              <strong id="preview-model-targets">CNN, DNABERT2, iPro-MP</strong>
+              <p id="preview-model-detail">Export plan for Colab/HPC; run small sklearn baselines here.</p>
+            </div>
+          </div>
           <details class="advanced-box" open>
             <summary>Benchmark Protocol</summary>
             <div class="control-grid">

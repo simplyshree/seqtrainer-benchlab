@@ -12,6 +12,7 @@
   --blue: #315f95;
   --amber: #a35b00;
   --good: #17875d;
+  --shadow: 0 12px 32px rgb(23 33 43 / 8%);
 }
 
 * {
@@ -53,10 +54,12 @@ button,
 button {
   background: var(--accent);
   color: white;
+  transition: background 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease;
 }
 
 button:hover {
   background: var(--accent-dark);
+  transform: translateY(-1px);
 }
 
 button:disabled {
@@ -125,6 +128,7 @@ nav {
   background: transparent;
   color: #dde7f0;
   text-align: left;
+  transition: background 0.16s ease, transform 0.12s ease;
 }
 
 .nav-button span {
@@ -264,12 +268,17 @@ p,
 
 .panel {
   display: none;
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 .panel.visible {
   display: grid;
   gap: 16px;
   min-width: 0;
+  opacity: 1;
+  transform: translateY(0);
+  animation: panel-in 0.22s ease both;
 }
 
 .section-head {
@@ -311,6 +320,13 @@ p,
   border-radius: 8px;
   background: var(--panel);
   padding: 16px;
+  box-shadow: 0 1px 0 rgb(23 33 43 / 3%);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.surface:hover {
+  border-color: #c7d1dc;
+  box-shadow: var(--shadow);
 }
 
 .stack {
@@ -383,6 +399,38 @@ p,
   padding: 12px;
   border-radius: 8px;
   background: #f4f7fa;
+}
+
+.analysis-card {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid #b6d9ce;
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  background: #eefaf6;
+  color: var(--ink);
+}
+
+.analysis-card span,
+.protocol-card span {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.analysis-card strong,
+.protocol-card strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.analysis-card p,
+.protocol-card p {
+  color: #405162;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .meta {
@@ -487,6 +535,36 @@ p,
 .model-section {
   display: grid;
   gap: 8px;
+}
+
+.protocol-preview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.protocol-card {
+  min-height: 132px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid #cfd9e4;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9fb 100%);
+  box-shadow: 0 8px 22px rgb(23 33 43 / 6%);
+}
+
+.protocol-card:nth-child(2) span {
+  color: var(--blue);
+}
+
+.protocol-card:nth-child(3) span {
+  color: #7b4c00;
+}
+
+.protocol-card:nth-child(4) span {
+  color: #5d4a8a;
 }
 
 .advanced-box {
@@ -732,6 +810,18 @@ th {
   }
 }
 
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 980px) {
   body {
     grid-template-columns: 1fr;
@@ -747,6 +837,7 @@ th {
   .option-grid,
   .model-list,
   .planned-models,
+  .protocol-preview,
   .email-form {
     grid-template-columns: 1fr;
   }

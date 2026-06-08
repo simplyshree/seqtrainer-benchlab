@@ -163,8 +163,9 @@ function updateDatasetState(dataset) {
   const largeText = dataset.large_dataset_warning
     ? ` Hosted small-run mode will use the first ${dataset.hosted_small_run_limit} rows unless you export the plan for Colab/HPC.`
     : "";
-  insight.textContent = `${classText}${largeText}`;
+  insight.innerHTML = `<span>Dataset Analysis</span><strong>${summary.available ? "Labels detected" : "Needs target review"}</strong><p>${classText}${largeText}</p>`;
   guidance.textContent = `${classText}${largeText} Default protocol: shared user/literature threshold, false positives treated as costly, 3 reruns, fixed materialized split.`;
+  updateBenchmarkPreview();
 
   if (summary.imbalance_detected) {
     showToast("Class imbalance detected. Review the class balancing option before running.");
@@ -212,6 +213,32 @@ function renderPlanOutput(plan, prompt) {
   document.querySelector("#plan-output").value = `${JSON.stringify(plan, null, 2)}\n\n--- CODEX PROMPT ---\n${prompt}`;
   document.querySelector("#download-plan").disabled = false;
   document.querySelector("#copy-prompt").disabled = false;
+}
+
+function optionText(selector) {
+  const node = document.querySelector(selector);
+  return node.options[node.selectedIndex]?.textContent || node.value;
+}
+
+function updateBenchmarkPreview() {
+  const payload = benchmarkPayload();
+  const rows = currentDataset?.row_count;
+  const capApplied = rows && rows > payload.max_rows;
+  setText("#preview-data-scope", rows ? `${Math.min(rows, payload.max_rows)} of ${rows} rows` : "No dataset loaded");
+  setText(
+    "#preview-data-detail",
+    rows
+      ? `${capApplied ? "Hosted small run is capped; export JSON for full Colab/HPC run." : "Hosted small run can use the uploaded rows."} Balance: ${optionText("#balance-strategy")}.`
+      : "Upload data to see hosted-run limits and class readiness."
+  );
+  setText("#preview-split-plan", optionText("#split-strategy"));
+  setText("#preview-split-detail", `Test ${payload.test_size}, validation ${payload.validation_size}, seed ${payload.random_seed}, reruns ${payload.reruns}.`);
+  setText("#preview-threshold-rule", optionText("#threshold-strategy"));
+  setText("#preview-threshold-detail", `${optionText("#threshold-scope")}; goal: ${optionText("#biological-goal")}${payload.threshold_value !== null ? `; value ${payload.threshold_value}` : ""}.`);
+  const comparison = payload.comparison_models.length ? payload.comparison_models.join(", ") : "No Colab/HPC models selected";
+  const runnable = payload.models.length ? payload.models.join(", ") : "No local baselines selected";
+  setText("#preview-model-targets", comparison);
+  setText("#preview-model-detail", `Local small run: ${runnable}. Export JSON for reproducible notebooks.`);
 }
 
 function renderCapabilities(data) {
@@ -481,6 +508,7 @@ function applyImportedConfig(plan) {
   setIfPresent("#biological-goal", threshold.biological_goal);
   setIfPresent("#balance-strategy", balance.strategy);
   setIfPresent("#early-stopping-patience", training.early_stopping_patience);
+  updateBenchmarkPreview();
 }
 
 document.querySelector("#config-json-file").addEventListener("change", async (event) => {
@@ -504,6 +532,15 @@ document.querySelectorAll(".preview-toggle").forEach((button) => {
     setPreviewExpanded(button.dataset.previewTarget, target.classList.contains("preview-collapsed"));
   });
 });
+
+document
+  .querySelectorAll(
+    "#benchmark-form input, #benchmark-form select, #benchmark-form textarea"
+  )
+  .forEach((node) => {
+    node.addEventListener("input", updateBenchmarkPreview);
+    node.addEventListener("change", updateBenchmarkPreview);
+  });
 
 document.querySelector("#email-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -537,3 +574,4 @@ document.querySelector("#email-form").addEventListener("submit", async (event) =
 checkHealth();
 api("/api/capabilities").then(renderCapabilities).catch(() => {});
 loadRuns().catch(() => {});
+updateBenchmarkPreview();

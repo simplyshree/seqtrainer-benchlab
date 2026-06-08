@@ -61,6 +61,15 @@ The exported plan records:
 - CNN, DNABERT2, and iPro-MP as Colab/HPC comparison targets
 - required artifacts for future reproducibility
 
+The JSON can be reused later to:
+
+- recreate the same split manifest and seeds
+- generate Colab or HPC notebooks from the Codex prompt
+- configure Docker/container runs with the same preprocessing and thresholds
+- compare future model outputs against the same benchmark contract
+- import the plan back into BenchLab or another benchmark tool
+- audit exactly why a threshold, balancing strategy, or row cap was chosen
+
 ## Future Model Slots
 
 CNN, DNABERT2, and iPro-MP are selectable in the benchmark planning/export section. They are
