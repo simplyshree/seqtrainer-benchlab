@@ -91,6 +91,7 @@
               <div><span>Columns</span><strong id="dataset-cols">-</strong></div>
               <div><span>Format</span><strong id="dataset-format">-</strong></div>
             </div>
+            <div id="dataset-insight" class="callout">Upload a labeled dataset to analyze class balance and benchmark readiness.</div>
           </div>
         </div>
         <div class="surface">
@@ -162,6 +163,55 @@
             <label>Test Size <input id="test-size" type="number" min="0.1" max="0.5" step="0.05" value="0.2" /></label>
             <label>Random Seed <input id="random-seed" type="number" value="42" /></label>
           </div>
+          <div id="benchmark-guidance" class="callout">Upload and analyze a dataset before running. Large hosted runs are capped to 1000 rows by default; export the JSON plan for Colab/HPC when the dataset is larger.</div>
+          <details class="advanced-box" open>
+            <summary>Benchmark Protocol</summary>
+            <div class="control-grid">
+              <label>Split Strategy
+                <select id="split-strategy">
+                  <option value="fixed_train_validation_test">Fixed train/validation/test</option>
+                  <option value="provided_train_validation_test">Use uploaded split files</option>
+                  <option value="kfold_small_dataset">5-fold CV for small data</option>
+                  <option value="repeated_seed_holdout">Repeated seeds holdout</option>
+                </select>
+              </label>
+              <label>Validation Size <input id="validation-size" type="number" min="0.05" max="0.4" step="0.05" value="0.1" /></label>
+              <label>Hosted Row Limit <input id="max-rows" type="number" min="100" step="100" value="1000" /></label>
+              <label>Threshold Strategy
+                <select id="threshold-strategy">
+                  <option value="user_or_literature">User/literature input</option>
+                  <option value="validation_mcc">Validation MCC selected</option>
+                  <option value="validation_f1">Validation F1 selected</option>
+                  <option value="median">Median threshold</option>
+                  <option value="high_sensitivity">High sensitivity goal</option>
+                </select>
+              </label>
+              <label>Threshold Value <input id="threshold-value" type="number" min="0" max="1" step="0.01" placeholder="0.5 if blank" /></label>
+              <label>Threshold Scope
+                <select id="threshold-scope">
+                  <option value="shared">Same threshold policy across models</option>
+                  <option value="per_model">Each model validates its own threshold</option>
+                </select>
+              </label>
+              <label>Class Balancing
+                <select id="balance-strategy">
+                  <option value="none">None unless model handles it</option>
+                  <option value="auto_undersample">Auto undersample if imbalanced</option>
+                  <option value="undersample">Force undersample binary classes</option>
+                </select>
+              </label>
+              <label>Reruns / Seeds <input id="reruns" type="number" min="1" max="100" value="3" /></label>
+              <label>CV Folds <input id="cv-folds" type="number" min="2" max="10" value="5" /></label>
+              <label>Early Stop Patience <input id="early-stopping-patience" type="number" min="0" max="50" value="5" /></label>
+              <label>Biological Goal
+                <select id="biological-goal">
+                  <option value="limit_false_positives">Limit false positives</option>
+                  <option value="high_sensitivity">High sensitivity</option>
+                  <option value="balanced_screening">Balanced screening</option>
+                </select>
+              </label>
+            </div>
+          </details>
           <div class="model-section">
             <h3>Runnable Models</h3>
             <div id="live-models" class="model-list">
@@ -170,7 +220,24 @@
               <label class="model-card"><input class="model-option" type="checkbox" value="gradient_boosting" /><span><strong>Gradient Boosting</strong><small>sklearn_tuning gbr</small></span></label>
             </div>
           </div>
-          <button type="submit">Run Benchmark</button>
+          <div class="model-section">
+            <h3>Colab/HPC Comparison Plan</h3>
+            <div class="model-list">
+              <label class="model-card"><input class="comparison-model-option" type="checkbox" value="cnn" checked /><span><strong>CNN</strong><small>Notebook/container target</small></span></label>
+              <label class="model-card"><input class="comparison-model-option" type="checkbox" value="dnabert2" checked /><span><strong>DNABERT2</strong><small>Colab/HPC target</small></span></label>
+              <label class="model-card"><input class="comparison-model-option" type="checkbox" value="ipro_mp" checked /><span><strong>iPro-MP</strong><small>External inference target</small></span></label>
+            </div>
+          </div>
+          <div class="planner-box">
+            <div class="planner-actions">
+              <label class="import-config">Import JSON <input id="config-json-file" type="file" accept=".json,application/json" /></label>
+              <button id="generate-plan" type="button" class="secondary">Generate JSON + Codex Prompt</button>
+              <button id="download-plan" type="button" class="secondary" disabled>Download JSON</button>
+              <button id="copy-prompt" type="button" class="secondary" disabled>Copy Prompt</button>
+            </div>
+            <textarea id="plan-output" readonly placeholder="Generated benchmarking JSON and Codex prompt will appear here."></textarea>
+          </div>
+          <button type="submit">Run Small Local Benchmark</button>
         </form>
       </section>
 

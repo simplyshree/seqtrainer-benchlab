@@ -49,6 +49,7 @@ MODEL_MAP = {
 }
 
 TARGET_COLUMN_CANDIDATES = ["target", "label", "y", "class", "promoter", "expression", "expn_med"]
+DEFAULT_SMALL_DATASET_LIMIT = 1000
 
 SEQTRAINER_SOURCE = {
     "repository": "SynBioDex/SeqTrainer",
@@ -89,9 +90,25 @@ class BenchmarkRequest(BaseModel):
     sequence_col: str = "sequence"
     target_col: str = "target"
     models: list[str] = Field(default_factory=lambda: ["linear_regression"])
+    comparison_models: list[str] = Field(default_factory=lambda: ["cnn", "dnabert2", "ipro_mp"])
     preprocessing: dict[str, Any] = Field(default_factory=lambda: {"use_gc": True, "use_kmers": True, "kmer_size": 4})
     test_size: float = 0.2
+    validation_size: float = 0.1
     random_seed: int = 42
+    split_strategy: str = "fixed_train_validation_test"
+    threshold_strategy: str = "user_or_literature"
+    threshold_value: float | None = None
+    threshold_scope: str = "shared"
+    biological_goal: str = "limit_false_positives"
+    balance_strategy: str = "none"
+    max_rows: int = DEFAULT_SMALL_DATASET_LIMIT
+    reruns: int = 3
+    cv_folds: int = 5
+    early_stopping_patience: int = 5
+
+
+class BenchmarkPlanRequest(BenchmarkRequest):
+    run_local_baseline: bool = False
 
 
 class EmailRunRequest(BaseModel):
@@ -214,6 +231,141 @@ def is_binary_numeric_target(target: pd.Series) -> bool:
     return bool(values) and values.issubset({0.0, 1.0})
 
 
+def summarize_target(df: pd.DataFrame, target_col: str | None) -> dict[str, Any]:
+    if not target_col or target_col not in df.columns:
+        return {"available": False, "message": "No target column detected yet."}
+
+    target = df[target_col].dropna()
+    counts = target.astype(str).value_counts().to_dict()
+    total = int(target.shape[0])
+    numeric_target = pd.to_numeric(target, errors="coerce")
+    binary_target = is_binary_numeric_target(numeric_target)
+    minority_fraction = None
+    imbalance_detected = False
+    if len(counts) >= 2 and total:
+        minority_fraction = min(counts.values()) / total
+        imbalance_detected = minority_fraction < 0.35
+
+    return {
+        "available": True,
+        "target_col": target_col,
+        "row_count_with_target": total,
+        "class_counts": counts,
+        "class_count": len(counts),
+        "binary_numeric": binary_target,
+        "minority_fraction": round(minority_fraction, 4) if minority_fraction is not None else None,
+        "imbalance_detected": imbalance_detected,
+        "recommendation": "Consider class balancing or class-weighted training." if imbalance_detected else "No strong class imbalance detected.",
+    }
+
+
+def make_benchmark_plan(request: BenchmarkPlanRequest | BenchmarkRequest, dataset_manifest: dict[str, Any]) -> dict[str, Any]:
+    threshold_value = request.threshold_value
+    if request.threshold_strategy == "median":
+        threshold_value = "median_from_validation_or_training_labels"
+    elif request.threshold_strategy == "validation_mcc":
+        threshold_value = "selected_on_validation_split_by_mcc"
+
+    return {
+        "schema": "seqtrainer_benchlab_benchmark_plan/v1",
+        "created_at": utc_now(),
+        "dataset": {
+            "dataset_id": request.dataset_id,
+            "original_name": dataset_manifest.get("original_name"),
+            "sha256": dataset_manifest.get("sha256"),
+            "rows_uploaded": dataset_manifest.get("row_count"),
+            "large_dataset_policy": f"Hosted small-run mode uses first {request.max_rows} rows unless run on Colab/HPC.",
+            "analysis": dataset_manifest.get("target_summary", {}),
+        },
+        "columns": {
+            "sequence_col": request.sequence_col,
+            "target_col": request.target_col,
+        },
+        "split": {
+            "strategy": request.split_strategy,
+            "test_size": request.test_size,
+            "validation_size": request.validation_size,
+            "random_seed": request.random_seed,
+            "cv_folds": request.cv_folds,
+            "reruns": request.reruns,
+            "materialize_manifest": True,
+            "notebook": "03_materialize_dataset_splits.ipynb",
+        },
+        "threshold": {
+            "strategy": request.threshold_strategy,
+            "value": threshold_value,
+            "scope": request.threshold_scope,
+            "biological_goal": request.biological_goal,
+            "false_positive_cost": "high",
+        },
+        "preprocessing": request.preprocessing,
+        "class_balance": {
+            "strategy": request.balance_strategy,
+            "activate_only_if_imbalanced": True,
+            "summary_required_before_training": True,
+        },
+        "models": {
+            "hosted_small_run": request.models,
+            "colab_hpc_comparison": request.comparison_models,
+            "notes": "CNN, DNABERT2, and iPro-MP are exported as reproducible Colab/HPC protocol targets.",
+        },
+        "training": {
+            "early_stopping_patience": request.early_stopping_patience,
+            "package_versions_required": True,
+            "docker_recommended": True,
+        },
+        "artifacts": [
+            "raw_data_source",
+            "split_manifest",
+            "seed",
+            "config_json",
+            "package_versions",
+            "threshold",
+            "metrics",
+            "predictions",
+            "model_checkpoint",
+            "docker_image_or_container_spec",
+        ],
+    }
+
+
+def make_codex_prompt(plan: dict[str, Any]) -> str:
+    return (
+        "Create a Colab/HPC-ready SeqTrainer benchmark notebook series from this JSON plan. "
+        "Materialize one fixed train/validation/test split manifest first, then run comparable "
+        "CNN, DNABERT2, and iPro-MP classification benchmarks using the same preprocessing, "
+        "same split manifest, same threshold policy, same seeds, and the listed artifacts. "
+        "If class imbalance is detected, apply the configured balancing strategy only when it is scientifically justified. "
+        "Export metrics, predictions, manifests, package versions, model checkpoints, and a Docker/container note.\n\n"
+        f"{json.dumps(plan, indent=2, sort_keys=True)}"
+    )
+
+
+def maybe_cap_rows(df: pd.DataFrame, max_rows: int) -> tuple[pd.DataFrame, bool]:
+    if max_rows > 0 and len(df) > max_rows:
+        return df.head(max_rows).copy(), True
+    return df, False
+
+
+def maybe_balance_binary_rows(df: pd.DataFrame, target_col: str, strategy: str, random_seed: int) -> tuple[pd.DataFrame, bool]:
+    if strategy not in {"undersample", "auto_undersample"} or target_col not in df.columns:
+        return df, False
+    numeric_target = pd.to_numeric(df[target_col], errors="coerce")
+    if not is_binary_numeric_target(numeric_target):
+        return df, False
+    working = df.assign(_bench_target=numeric_target)
+    groups = [group for _, group in working.dropna(subset=["_bench_target"]).groupby("_bench_target")]
+    if len(groups) != 2:
+        return df, False
+    counts = [len(group) for group in groups]
+    minority_fraction = min(counts) / sum(counts)
+    if strategy == "auto_undersample" and minority_fraction >= 0.35:
+        return df, False
+    min_count = min(len(group) for group in groups)
+    balanced = pd.concat([group.sample(n=min_count, random_state=random_seed) for group in groups], ignore_index=True)
+    return balanced.drop(columns=["_bench_target"]).sample(frac=1, random_state=random_seed).reset_index(drop=True), True
+
+
 app = FastAPI(title="SeqTrainer BenchLab", version="0.1.0")
 
 
@@ -255,6 +407,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Dataset contains no rows")
 
     df.to_csv(folder / "dataset.csv", index=False)
+    suggested_target_col = infer_column(list(df.columns), TARGET_COLUMN_CANDIDATES)
     manifest = {
         "dataset_id": dataset_id,
         "original_name": original_name,
@@ -262,7 +415,10 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "row_count": int(len(df)),
         "columns": list(df.columns),
         "suggested_sequence_col": infer_column(list(df.columns), ["sequence", "seq", "variant", "dna"]),
-        "suggested_target_col": infer_column(list(df.columns), TARGET_COLUMN_CANDIDATES),
+        "suggested_target_col": suggested_target_col,
+        "target_summary": summarize_target(df, suggested_target_col),
+        "large_dataset_warning": int(len(df)) > DEFAULT_SMALL_DATASET_LIMIT,
+        "hosted_small_run_limit": DEFAULT_SMALL_DATASET_LIMIT,
         "sha256": file_sha256(raw_path),
         "source_format": raw_path.suffix.lower(),
     }
@@ -302,6 +458,13 @@ def preview_preprocessing(dataset_id: str, sequence_col: str = Form("sequence"),
     }
 
 
+@app.post("/api/benchmark-plan")
+def generate_benchmark_plan(request: BenchmarkPlanRequest) -> dict[str, Any]:
+    _, dataset_manifest = load_dataset(request.dataset_id)
+    plan = make_benchmark_plan(request, dataset_manifest)
+    return {"plan": plan, "codex_prompt": make_codex_prompt(plan)}
+
+
 @app.post("/api/benchmarks")
 def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     df, dataset_manifest = load_dataset(request.dataset_id)
@@ -320,6 +483,10 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     unknown_models = [model for model in selected_models if model not in MODEL_MAP]
     if unknown_models:
         raise HTTPException(status_code=400, detail=f"Unsupported model(s): {', '.join(unknown_models)}")
+
+    source_rows = int(len(df))
+    df, row_cap_applied = maybe_cap_rows(df, request.max_rows)
+    df, class_balance_applied = maybe_balance_binary_rows(df, target_col, request.balance_strategy, request.random_seed)
 
     run_id = str(uuid.uuid4())
     folder = run_dir(run_id)
@@ -369,7 +536,9 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
             "prediction": predictions,
         }
         if binary_target:
-            threshold = 0.5
+            threshold = request.threshold_value if request.threshold_value is not None else 0.5
+            if request.threshold_strategy == "median":
+                threshold = float(pd.Series(predictions).median())
             actual_classes = y_test.astype(int).to_numpy()
             predicted_classes = (predictions >= threshold).astype(int)
             tn, fp, fn, tp = confusion_matrix(actual_classes, predicted_classes, labels=[0, 1]).ravel()
@@ -377,6 +546,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
                 {
                     "task_type": "binary_label_regression_baseline",
                     "classification_threshold": threshold,
+                    "threshold_strategy": request.threshold_strategy,
                     "accuracy": float(accuracy_score(actual_classes, predicted_classes)),
                     "precision": float(precision_score(actual_classes, predicted_classes, zero_division=0)),
                     "recall": float(recall_score(actual_classes, predicted_classes, zero_division=0)),
@@ -398,16 +568,30 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     training_config = {
         "models": selected_models,
         "test_size": request.test_size,
+        "validation_size": request.validation_size,
         "random_seed": request.random_seed,
+        "split_strategy": request.split_strategy,
         "sequence_col": request.sequence_col,
         "target_col": target_col,
-        "rows_uploaded": int(dataset_manifest.get("row_count", len(df))),
+        "rows_uploaded": int(dataset_manifest.get("row_count", source_rows)),
+        "hosted_row_limit": request.max_rows,
+        "row_cap_applied": row_cap_applied,
+        "class_balance_strategy": request.balance_strategy,
+        "class_balance_applied": class_balance_applied,
         "rows_used": rows_used,
         "train_rows": train_rows,
         "test_rows": test_rows,
         "binary_target": binary_target,
-        "classification_threshold": 0.5 if binary_target else None,
+        "threshold_strategy": request.threshold_strategy,
+        "threshold_scope": request.threshold_scope,
+        "biological_goal": request.biological_goal,
+        "classification_threshold": threshold if binary_target else None,
+        "comparison_models_for_colab_hpc": request.comparison_models,
+        "reruns": request.reruns,
+        "cv_folds": request.cv_folds,
+        "early_stopping_patience": request.early_stopping_patience,
     }
+    benchmark_plan = make_benchmark_plan(request, dataset_manifest)
     run_manifest = {
         "run_id": run_id,
         "created_at": utc_now(),
@@ -415,6 +599,8 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "dataset_sha256": dataset_manifest["sha256"],
         "seqtrainer_benchlab_version": "0.1.0",
         "rows_used": rows_used,
+        "row_cap_applied": row_cap_applied,
+        "class_balance_applied": class_balance_applied,
         "train_rows": train_rows,
         "test_rows": test_rows,
         "target_kind": "binary_numeric_label" if binary_target else "numeric_regression",
@@ -424,6 +610,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
             "dataset_manifest": "dataset_manifest.json",
             "preprocessing_config": "preprocessing_config.json",
             "training_config": "training_config.json",
+            "benchmark_plan": "benchmark_plan.json",
         },
     }
 
@@ -431,6 +618,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     write_json(folder / "dataset_manifest.json", dataset_manifest)
     write_json(folder / "preprocessing_config.json", request.preprocessing)
     write_json(folder / "training_config.json", training_config)
+    write_json(folder / "benchmark_plan.json", benchmark_plan)
     write_json(folder / "run_manifest.json", run_manifest)
 
     dataset_removed = False
@@ -447,6 +635,8 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "dataset": dataset_manifest,
         "training_config": training_config,
         "preprocessing_config": request.preprocessing,
+        "benchmark_plan": benchmark_plan,
+        "codex_prompt": make_codex_prompt(benchmark_plan),
         "dataset_removed": dataset_removed,
     }
 
@@ -475,6 +665,7 @@ def get_run(run_id: str) -> dict[str, Any]:
         "dataset": read_json(folder / "dataset_manifest.json"),
         "training_config": read_json(folder / "training_config.json"),
         "preprocessing_config": read_json(folder / "preprocessing_config.json"),
+        "benchmark_plan": read_json(folder / "benchmark_plan.json") if (folder / "benchmark_plan.json").exists() else {},
         "predictions": predictions.head(100).round(6).to_dict(orient="records"),
     }
 
@@ -522,8 +713,11 @@ def export_run(run_id: str) -> FileResponse:
             "dataset_manifest.json",
             "preprocessing_config.json",
             "training_config.json",
+            "benchmark_plan.json",
         ]:
-            archive.write(folder / artifact, arcname=artifact)
+            artifact_path = folder / artifact
+            if artifact_path.exists():
+                archive.write(artifact_path, arcname=artifact)
     return FileResponse(zip_path, filename=f"seqtrainer-benchlab-run-{run_id}.zip")
 
 

@@ -14,11 +14,14 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
 - Select sequence and target columns for tabular files
 - Generate GC-content and k-mer features
 - Generate optional one-hot features
+- Analyze target labels for class counts and imbalance warnings
+- Generate a reproducible benchmark-plan JSON and Codex prompt for Colab/HPC workflows
 - Run baseline regression models:
   - Linear Regression
   - Random Forest
   - Gradient Boosting
 - Show train/test split size, seed, selected columns, preprocessing config, and data cleanup status after each run
+- Configure split strategy, validation size, reruns, CV folds, early stopping patience, threshold policy, and class balancing
 - For 0/1 labels, report thresholded classification metrics alongside the current-main regression baselines:
   - Accuracy
   - Precision
@@ -32,12 +35,38 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
   - dataset manifest
   - preprocessing config
   - training config
+  - benchmark plan JSON
+
+## Benchmark Planning
+
+BenchLab has two modes:
+
+1. Hosted small-run mode for quick local/sklearn baselines.
+2. Planning/export mode for CNN, DNABERT2, and iPro-MP comparison workflows on Colab or HPC.
+
+The hosted app is intentionally conservative. If a dataset is larger than 1000 rows, the UI
+warns the scientist and the hosted runner uses the first 1000 rows by default. Full-size runs
+should use the exported JSON plan and Codex prompt to create local, Colab, Docker, or HPC
+notebooks.
+
+The exported plan records:
+
+- raw dataset identity and SHA256
+- selected sequence and label columns
+- fixed split strategy and materialized split-manifest requirement
+- threshold strategy, including user/literature input, validation MCC, F1, median, or biological goal
+- shared or per-model threshold policy
+- class imbalance summary and optional balancing strategy
+- reruns/seeds, CV folds, and early stopping patience
+- CNN, DNABERT2, and iPro-MP as Colab/HPC comparison targets
+- required artifacts for future reproducibility
 
 ## Future Model Slots
 
-These are not selectable in the web app until the upstream project exposes stable APIs.
-The current upstream repository includes DNABERT2 notebooks and experimental GNN code, but
-the web app only enables the baseline sklearn models from the main branch scripts.
+CNN, DNABERT2, and iPro-MP are selectable in the benchmark planning/export section. They are
+not executed inside the hosted FastAPI app yet. The current upstream repository includes
+DNABERT2 notebooks and experimental GNN code, but the web app only enables the baseline
+sklearn models from the main branch scripts for hosted execution.
 
 For binary label datasets, such as `label` values of `0` and `1`, BenchLab still trains the
 current-main sklearn regression baselines. It then applies a `0.5` prediction threshold to
@@ -125,6 +154,7 @@ Every run writes artifacts to `storage/runs/<run_id>`:
 - `dataset_manifest.json`
 - `preprocessing_config.json`
 - `training_config.json`
+- `benchmark_plan.json`
 
 Uploaded source datasets are deleted automatically after a successful benchmark run by default.
 The run keeps the dataset manifest, metrics, predictions, and configs, but not the uploaded

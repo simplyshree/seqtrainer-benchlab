@@ -30,7 +30,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -425,12 +427,14 @@ p,
 
 .controls input[type="number"],
 .controls input:not([type]),
+.controls select,
 .email-form input {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 9px 10px;
   color: var(--ink);
+  background: white;
 }
 
 .option-grid,
@@ -483,6 +487,65 @@ p,
 .model-section {
   display: grid;
   gap: 8px;
+}
+
+.advanced-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfd;
+}
+
+.advanced-box summary {
+  cursor: pointer;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.planner-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.planner-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.import-config {
+  min-height: 38px;
+  border-radius: 6px;
+  padding: 0 12px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  background: #e6ecf2;
+  color: var(--ink) !important;
+  cursor: pointer;
+}
+
+.import-config input {
+  display: none;
+}
+
+#plan-output {
+  width: 100%;
+  min-height: 210px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--ink);
+  background: white;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .capability-list {

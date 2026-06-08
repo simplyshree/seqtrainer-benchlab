@@ -1,5 +1,7 @@
 let currentDatasetId = null;
 let currentRunId = null;
+let currentDataset = null;
+let currentPlan = null;
 
 const toast = document.querySelector("#toast");
 const previewLabels = {
@@ -136,6 +138,7 @@ function preprocessingConfig() {
 }
 
 function updateDatasetState(dataset) {
+  currentDataset = dataset;
   setText("#state-dataset", dataset.original_name);
   setText("#dataset-rows", dataset.row_count);
   setText("#dataset-cols", dataset.columns.length);
@@ -148,6 +151,67 @@ function updateDatasetState(dataset) {
   if (dataset.suggested_target_col) {
     document.querySelector("#target-col").value = dataset.suggested_target_col;
   }
+
+  const summary = dataset.target_summary || {};
+  const insight = document.querySelector("#dataset-insight");
+  const guidance = document.querySelector("#benchmark-guidance");
+  const classText = summary.available
+    ? `Target ${summary.target_col}: ${Object.entries(summary.class_counts || {})
+        .map(([label, count]) => `${label}=${count}`)
+        .join(", ")}. ${summary.recommendation}`
+    : "No label/target column detected. Choose the target column before benchmarking.";
+  const largeText = dataset.large_dataset_warning
+    ? ` Hosted small-run mode will use the first ${dataset.hosted_small_run_limit} rows unless you export the plan for Colab/HPC.`
+    : "";
+  insight.textContent = `${classText}${largeText}`;
+  guidance.textContent = `${classText}${largeText} Default protocol: shared user/literature threshold, false positives treated as costly, 3 reruns, fixed materialized split.`;
+
+  if (summary.imbalance_detected) {
+    showToast("Class imbalance detected. Review the class balancing option before running.");
+  } else if (dataset.large_dataset_warning) {
+    showToast(`Large dataset detected. Hosted runs use first ${dataset.hosted_small_run_limit} rows by default.`);
+  }
+}
+
+function numericValue(selector, fallback = null) {
+  const value = document.querySelector(selector).value;
+  if (value === "") return fallback;
+  return Number(value);
+}
+
+function selectedValues(selector) {
+  return [...document.querySelectorAll(selector)].filter((item) => item.checked).map((item) => item.value);
+}
+
+function benchmarkPayload() {
+  return {
+    dataset_id: currentDatasetId,
+    sequence_col: document.querySelector("#sequence-col").value,
+    target_col: document.querySelector("#target-col").value,
+    models: selectedValues(".model-option"),
+    comparison_models: selectedValues(".comparison-model-option"),
+    preprocessing: preprocessingConfig(),
+    test_size: Number(document.querySelector("#test-size").value),
+    validation_size: Number(document.querySelector("#validation-size").value),
+    random_seed: Number(document.querySelector("#random-seed").value),
+    split_strategy: document.querySelector("#split-strategy").value,
+    threshold_strategy: document.querySelector("#threshold-strategy").value,
+    threshold_value: numericValue("#threshold-value"),
+    threshold_scope: document.querySelector("#threshold-scope").value,
+    biological_goal: document.querySelector("#biological-goal").value,
+    balance_strategy: document.querySelector("#balance-strategy").value,
+    max_rows: Number(document.querySelector("#max-rows").value),
+    reruns: Number(document.querySelector("#reruns").value),
+    cv_folds: Number(document.querySelector("#cv-folds").value),
+    early_stopping_patience: Number(document.querySelector("#early-stopping-patience").value),
+  };
+}
+
+function renderPlanOutput(plan, prompt) {
+  currentPlan = { plan, codex_prompt: prompt };
+  document.querySelector("#plan-output").value = `${JSON.stringify(plan, null, 2)}\n\n--- CODEX PROMPT ---\n${prompt}`;
+  document.querySelector("#download-plan").disabled = false;
+  document.querySelector("#copy-prompt").disabled = false;
 }
 
 function renderCapabilities(data) {
@@ -249,20 +313,16 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
   }
   const submitBtn = document.querySelector("#benchmark-form button[type='submit']");
   await withLoading(submitBtn, async () => {
-    const models = [...document.querySelectorAll(".model-option:checked")].map((item) => item.value);
+    const payload = benchmarkPayload();
+    const models = payload.models;
     if (!models.length) {
       showToast("Choose at least one runnable model.");
       return;
     }
-    const payload = {
-      dataset_id: currentDatasetId,
-      sequence_col: document.querySelector("#sequence-col").value,
-      target_col: document.querySelector("#target-col").value,
-      models,
-      preprocessing: preprocessingConfig(),
-      test_size: Number(document.querySelector("#test-size").value),
-      random_seed: Number(document.querySelector("#random-seed").value),
-    };
+    if (currentDataset && currentDataset.row_count > payload.max_rows) {
+      const proceed = window.confirm(`This hosted run will use only the first ${payload.max_rows} rows from ${currentDataset.row_count} uploaded rows. Export the JSON plan for Colab/HPC if you need the full dataset. Continue with the small local run?`);
+      if (!proceed) return;
+    }
     try {
       const data = await api("/api/benchmarks", {
         method: "POST",
@@ -312,7 +372,12 @@ function renderRunDetails(payload) {
     models: training.models || [],
     split: `${training.train_rows ?? run.train_rows ?? "-"} train / ${training.test_rows ?? run.test_rows ?? "-"} test`,
     rows_used: training.rows_used ?? run.rows_used ?? "-",
+    hosted_row_limit: training.hosted_row_limit ?? "-",
+    row_cap_applied: training.row_cap_applied ? "yes" : "no",
+    class_balance: training.class_balance_applied ? `${training.class_balance_strategy} applied` : training.class_balance_strategy || "none",
+    threshold: training.classification_threshold ?? training.threshold_strategy ?? "not used",
     random_seed: training.random_seed ?? "-",
+    reruns: training.reruns ?? "-",
     preprocessing: preprocessingText,
     data_cleanup: cleanup,
   });
@@ -355,6 +420,80 @@ async function loadRun(runId) {
 
 document.querySelector("#refresh-runs").addEventListener("click", () => {
   loadRuns().catch((error) => showToast(error.message));
+});
+
+document.querySelector("#generate-plan").addEventListener("click", async () => {
+  if (!currentDatasetId) {
+    showToast("Upload a dataset first.");
+    return;
+  }
+  try {
+    const data = await api("/api/benchmark-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(benchmarkPayload()),
+    });
+    renderPlanOutput(data.plan, data.codex_prompt);
+    showToast("Benchmark JSON and Codex prompt generated.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+document.querySelector("#download-plan").addEventListener("click", () => {
+  if (!currentPlan) return;
+  const blob = new Blob([JSON.stringify(currentPlan.plan, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "seqtrainer-benchmark-plan.json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+document.querySelector("#copy-prompt").addEventListener("click", async () => {
+  if (!currentPlan) return;
+  await navigator.clipboard.writeText(currentPlan.codex_prompt);
+  showToast("Codex prompt copied.");
+});
+
+function setIfPresent(selector, value) {
+  const node = document.querySelector(selector);
+  if (node && value !== undefined && value !== null) node.value = value;
+}
+
+function applyImportedConfig(plan) {
+  const columns = plan.columns || {};
+  const split = plan.split || {};
+  const threshold = plan.threshold || {};
+  const balance = plan.class_balance || {};
+  const training = plan.training || {};
+  setIfPresent("#sequence-col", columns.sequence_col);
+  setIfPresent("#target-col", columns.target_col);
+  setIfPresent("#split-strategy", split.strategy);
+  setIfPresent("#test-size", split.test_size);
+  setIfPresent("#validation-size", split.validation_size);
+  setIfPresent("#random-seed", split.random_seed);
+  setIfPresent("#cv-folds", split.cv_folds);
+  setIfPresent("#reruns", split.reruns);
+  setIfPresent("#threshold-strategy", threshold.strategy);
+  if (typeof threshold.value === "number") setIfPresent("#threshold-value", threshold.value);
+  setIfPresent("#threshold-scope", threshold.scope);
+  setIfPresent("#biological-goal", threshold.biological_goal);
+  setIfPresent("#balance-strategy", balance.strategy);
+  setIfPresent("#early-stopping-patience", training.early_stopping_patience);
+}
+
+document.querySelector("#config-json-file").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    const imported = JSON.parse(await file.text());
+    applyImportedConfig(imported);
+    document.querySelector("#plan-output").value = JSON.stringify(imported, null, 2);
+    showToast("Benchmark JSON imported.");
+  } catch (error) {
+    showToast(`Could not import JSON: ${error.message}`);
+  }
 });
 
 document.querySelectorAll(".preview-toggle").forEach((button) => {
