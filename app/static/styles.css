@@ -433,6 +433,11 @@ p,
   line-height: 1.45;
 }
 
+.compact-analysis {
+  margin-top: 12px;
+  background: #f7fcfa;
+}
+
 .meta {
   display: grid;
   grid-template-columns: 130px 1fr;

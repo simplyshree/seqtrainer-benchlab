@@ -154,6 +154,7 @@ function updateDatasetState(dataset) {
 
   const summary = dataset.target_summary || {};
   const insight = document.querySelector("#dataset-insight");
+  const uploadAnalysis = document.querySelector("#upload-analysis");
   const guidance = document.querySelector("#benchmark-guidance");
   const classText = summary.available
     ? `Target ${summary.target_col}: ${Object.entries(summary.class_counts || {})
@@ -163,8 +164,11 @@ function updateDatasetState(dataset) {
   const largeText = dataset.large_dataset_warning
     ? ` Hosted small-run mode will use the first ${dataset.hosted_small_run_limit} rows unless you export the plan for Colab/HPC.`
     : "";
-  insight.innerHTML = `<span>Dataset Analysis</span><strong>${summary.available ? "Labels detected" : "Needs target review"}</strong><p>${classText}${largeText}</p>`;
+  const analysisMarkup = `<span>Dataset Analysis</span><strong>${summary.available ? "Labels detected" : "Needs target review"}</strong><p>${classText}${largeText}</p>`;
+  insight.innerHTML = analysisMarkup;
+  uploadAnalysis.innerHTML = analysisMarkup;
   guidance.textContent = `${classText}${largeText} Default protocol: shared user/literature threshold, false positives treated as costly, 3 reruns, fixed materialized split.`;
+  document.querySelector("#continue-preprocess").disabled = false;
   updateBenchmarkPreview();
 
   if (summary.imbalance_detected) {
@@ -298,12 +302,19 @@ document.querySelector("#upload-form").addEventListener("submit", async (event) 
       renderMeta(document.querySelector("#dataset-meta"), data.dataset);
       renderPreviewTable(document.querySelector("#dataset-preview"), data.preview);
       updateDatasetState(data.dataset);
-      showToast("Dataset uploaded.");
-      goToPanel("preprocess");
+      showToast("Dataset uploaded. Review the analysis before continuing.");
     } catch (error) {
       showToast(error.message);
     }
   });
+});
+
+document.querySelector("#continue-preprocess").addEventListener("click", () => {
+  if (!currentDatasetId) {
+    showToast("Upload a dataset first.");
+    return;
+  }
+  goToPanel("preprocess");
 });
 
 document.querySelector("#preprocess-form").addEventListener("submit", async (event) => {

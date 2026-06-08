@@ -64,9 +64,9 @@
         <div class="section-head">
           <div>
             <h2>Dataset</h2>
-            <p>Use tabular DNA sequence files, FASTA records, or SBOL/XML sequence designs.</p>
+            <p>Upload labeled DNA data with one sequence column and one label column.</p>
           </div>
-          <span class="format-list">CSV TSV FASTA SBOL/XML</span>
+          <span class="format-list">sequence + label</span>
         </div>
         <div class="grid two">
           <form id="upload-form" class="surface upload-panel">
@@ -74,12 +74,17 @@
               <input id="dataset-file" type="file" accept=".csv,.tsv,.txt,.fa,.fasta,.xml,.rdf,.sbol" required />
               <span class="upload-icon">+</span>
               <div class="drop-inner">
-                <strong>Choose dataset file</strong>
-                <small>Sequence column is auto-previewed after upload.</small>
+                <strong>Choose sequence + label dataset</strong>
+                <small>Best input: CSV with columns named sequence and label.</small>
               </div>
             </label>
             <div class="file-info" id="file-info">No file chosen</div>
             <button type="submit">Upload Dataset</button>
+            <div id="upload-analysis" class="analysis-card compact-analysis">
+              <span>Dataset Analysis</span>
+              <strong>Waiting for upload</strong>
+              <p>After upload, class counts and small-run limits will appear here before you continue.</p>
+            </div>
           </form>
           <div class="surface stack">
             <div id="dataset-insight" class="analysis-card">
@@ -96,6 +101,7 @@
               <div><span>Columns</span><strong id="dataset-cols">-</strong></div>
               <div><span>Format</span><strong id="dataset-format">-</strong></div>
             </div>
+            <button id="continue-preprocess" type="button" class="secondary" disabled>Continue to Preprocess</button>
           </div>
         </div>
         <div class="surface">
