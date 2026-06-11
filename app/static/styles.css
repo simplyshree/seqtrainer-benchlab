@@ -462,13 +462,17 @@ p,
 }
 
 .controls.wide {
-  max-width: 920px;
+  max-width: 1040px;
 }
 
 .control-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.compact-grid {
+  grid-template-columns: minmax(220px, 360px);
 }
 
 .controls label {
@@ -549,7 +553,7 @@ p,
 }
 
 .protocol-card {
-  min-height: 132px;
+  min-height: 116px;
   display: grid;
   align-content: start;
   gap: 7px;
@@ -575,14 +579,28 @@ p,
 .advanced-box {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px 12px;
   background: #fbfcfd;
 }
 
 .advanced-box summary {
   cursor: pointer;
   font-weight: 800;
+}
+
+.advanced-box[open] summary {
   margin-bottom: 12px;
+}
+
+.advanced-box h3 {
+  margin-top: 2px;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .planner-box {

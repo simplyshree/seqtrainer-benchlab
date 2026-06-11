@@ -214,7 +214,9 @@ function benchmarkPayload() {
 
 function renderPlanOutput(plan, prompt) {
   currentPlan = { plan, codex_prompt: prompt };
-  document.querySelector("#plan-output").value = `${JSON.stringify(plan, null, 2)}\n\n--- CODEX PROMPT ---\n${prompt}`;
+  const output = document.querySelector("#plan-output");
+  output.value = `${JSON.stringify(plan, null, 2)}\n\n--- CODEX PROMPT ---\n${prompt}`;
+  output.classList.remove("hidden");
   document.querySelector("#download-plan").disabled = false;
   document.querySelector("#copy-prompt").disabled = false;
 }
@@ -528,7 +530,9 @@ document.querySelector("#config-json-file").addEventListener("change", async (ev
   try {
     const imported = JSON.parse(await file.text());
     applyImportedConfig(imported);
-    document.querySelector("#plan-output").value = JSON.stringify(imported, null, 2);
+    const output = document.querySelector("#plan-output");
+    output.value = JSON.stringify(imported, null, 2);
+    output.classList.remove("hidden");
     showToast("Benchmark JSON imported.");
   } catch (error) {
     showToast(`Could not import JSON: ${error.message}`);
