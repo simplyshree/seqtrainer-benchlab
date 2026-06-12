@@ -169,13 +169,14 @@ function updateDatasetState(dataset) {
   const insight = document.querySelector("#dataset-insight");
   const uploadAnalysis = document.querySelector("#upload-analysis");
   const guidance = document.querySelector("#benchmark-guidance");
+  const localRunLimit = dataset.local_small_run_limit;
   const classText = summary.available
     ? `Target ${summary.target_col}: ${Object.entries(summary.class_counts || {})
         .map(([label, count]) => `${label}=${count}`)
         .join(", ")}. ${summary.recommendation}`
     : "No label/target column detected. Choose the target column before benchmarking.";
   const largeText = dataset.large_dataset_warning
-    ? ` Hosted small-run mode will use the first ${dataset.hosted_small_run_limit} rows unless you export the plan for Colab/HPC.`
+    ? ` Local quick-run mode will use the first ${localRunLimit} rows unless you export the plan for Colab/HPC.`
     : "";
   const analysisMarkup = `<span>Dataset Analysis</span><strong>${summary.available ? "Labels detected" : "Needs target review"}</strong><p>${classText}${largeText}</p>`;
   insight.innerHTML = analysisMarkup;
@@ -187,7 +188,7 @@ function updateDatasetState(dataset) {
   if (summary.imbalance_detected) {
     showToast("Class imbalance detected. Review the class balancing option before running.");
   } else if (dataset.large_dataset_warning) {
-    showToast(`Large dataset detected. Hosted runs use first ${dataset.hosted_small_run_limit} rows by default.`);
+    showToast(`Large dataset detected. Local quick runs use the first ${localRunLimit} rows by default.`);
   }
 }
 
@@ -248,8 +249,8 @@ function updateBenchmarkPreview() {
   setText(
     "#preview-data-detail",
     rows
-      ? `${capApplied ? "Hosted small run is capped; export JSON for full Colab/HPC run." : "Hosted small run can use the uploaded rows."} Balance: ${optionText("#balance-strategy")}.`
-      : "Upload data to see hosted-run limits and class readiness."
+      ? `${capApplied ? "Local quick run is capped; export JSON for full Colab/HPC run." : "Local quick run can use the uploaded rows."} Balance: ${optionText("#balance-strategy")}.`
+      : "Upload data to see local-run limits and class readiness."
   );
   setText("#preview-split-plan", optionText("#split-strategy"));
   setText("#preview-split-detail", `Test ${payload.test_size}, validation ${payload.validation_size}, seed ${payload.random_seed}, ${payload.cv_folds}-fold CV, ${payload.reruns} reruns, ${payload.training_cycles} cycles.`);
@@ -378,7 +379,7 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
       return;
     }
     if (currentDataset && currentDataset.row_count > payload.max_rows) {
-      const proceed = window.confirm(`This hosted run will use only the first ${payload.max_rows} rows from ${currentDataset.row_count} uploaded rows. Export the JSON plan for Colab/HPC if you need the full dataset. Continue with the small local run?`);
+      const proceed = window.confirm(`This local quick run will use only the first ${payload.max_rows} rows from ${currentDataset.row_count} uploaded rows. Export the JSON plan for Colab/HPC if you need the full dataset. Continue?`);
       if (!proceed) return;
     }
     try {
@@ -470,7 +471,7 @@ function renderRunDetails(payload) {
     models: training.models || [],
     split: `${training.train_rows ?? run.train_rows ?? "-"} train / ${training.test_rows ?? run.test_rows ?? "-"} test`,
     rows_used: training.rows_used ?? run.rows_used ?? "-",
-    hosted_row_limit: training.hosted_row_limit ?? "-",
+    local_row_limit: training.local_row_limit ?? "-",
     row_cap_applied: training.row_cap_applied ? "yes" : "no",
     class_balance: training.class_balance_applied ? `${training.class_balance_strategy} applied` : training.class_balance_strategy || "none",
     threshold: training.classification_threshold ?? training.threshold_strategy ?? "not used",

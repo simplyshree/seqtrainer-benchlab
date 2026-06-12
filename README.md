@@ -1,11 +1,13 @@
 # SeqTrainer BenchLab
 
-SeqTrainer BenchLab is a lightweight web workbench for DNA sequence benchmark runs.
+SeqTrainer BenchLab is a local-first web workbench for DNA sequence benchmark runs.
 It wraps the practical capabilities available in the current SeqTrainer main branch:
 dataset loading, sequence preprocessing, k-mer and GC features, simple baselines, metrics,
 predictions, and reproducibility manifests.
 
-This MVP is intentionally deployable as a single FastAPI service with static frontend assets.
+This MVP is intended to be run locally, preferably with Docker. It is not designed as a
+shared web service because it has no login system, no per-user isolation, and works with
+uploaded biological datasets.
 
 ## What Works Now
 
@@ -27,6 +29,7 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
   - Precision
   - Recall
   - F1
+  - MCC
   - Confusion counts
 - Export:
   - metrics
@@ -41,11 +44,11 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
 
 BenchLab has two modes:
 
-1. Hosted small-run mode for quick local/sklearn baselines.
+1. Local small-run mode for quick sklearn baselines.
 2. Planning/export mode for CNN, DNABERT2, and iPro-MP comparison workflows on Colab or HPC.
 
-The hosted app is intentionally conservative. If a dataset is larger than 1000 rows, the UI
-warns the scientist and the hosted runner uses the first 1000 rows by default. Full-size runs
+The local app is intentionally conservative. If a dataset is larger than 1000 rows, the UI
+warns the scientist and the small-run path uses the first 1000 rows by default. Full-size runs
 should use the exported JSON plan and Codex prompt to create local, Colab, Docker, or HPC
 notebooks.
 
@@ -74,9 +77,9 @@ The JSON can be reused later to:
 ## Future Model Slots
 
 CNN, DNABERT2, and iPro-MP are selectable in the benchmark planning/export section. They are
-not executed inside the hosted FastAPI app yet. The current upstream repository includes
+not executed inside the local FastAPI app yet. The current upstream repository includes
 DNABERT2 notebooks and experimental GNN code, but the web app only enables the baseline
-sklearn models from the main branch scripts for hosted execution.
+sklearn models from the main branch scripts for local execution.
 
 For binary label datasets, such as `label` values of `0` and `1`, BenchLab still trains the
 current-main sklearn regression baselines. It then applies a `0.5` prediction threshold to
@@ -89,8 +92,8 @@ This web app is built around the current upstream project at
 https://github.com/SynBioDex/SeqTrainer.
 
 The upstream main branch is research-oriented, with reusable kernels in `src/seqtrainer`
-and model workflows in notebooks/scripts. BenchLab uses a web-safe adapter of those current
-capabilities so the application can run on modern Python web hosts:
+and model workflows in notebooks/scripts. BenchLab uses a local web adapter of those current
+capabilities so the application can run consistently on a scientist's machine:
 
 - SBOL/XML sequence extraction mirrors `dataset_builder.get_sequence_from_sbol`
 - numerical SBOL target discovery mirrors `dataset_builder.get_y_label` behavior
@@ -115,32 +118,39 @@ Open:
 http://127.0.0.1:8000
 ```
 
-## Deployment
+## Local Docker Use
 
-This repo can be hosted as a Python web service on Render, Railway, Fly.io, Azure App Service,
-or any Docker-capable host.
+Recommended runtime: Docker or Python 3.11.
 
-Recommended runtime: Python 3.11.
-
-Render:
-
-1. Push this repository to GitHub.
-2. In Render, create a new Blueprint or Web Service from the GitHub repository.
-3. Use:
-   - Build command: `pip install -r requirements.txt`
-   - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - Runtime: Python 3.11
-4. Add optional email environment variables if SMTP delivery is needed.
-5. For production, add persistent storage or object storage for run artifacts. The app deletes
-   uploaded source datasets after each successful benchmark by default, but exported run
-   artifacts still live under `storage/runs`.
-
-Docker:
+Build the local image:
 
 ```bash
 docker build -t seqtrainer-benchlab .
-docker run -p 8000:8000 seqtrainer-benchlab
 ```
+
+Run it locally only:
+
+```bash
+docker run --rm -p 127.0.0.1:8000:8000 seqtrainer-benchlab
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+By default, container storage is temporary. When the container stops, run artifacts inside
+the container are removed. If you deliberately want local persistent artifacts, mount a
+local storage folder:
+
+```powershell
+docker run --rm -p 127.0.0.1:8000:8000 -v ${PWD}\storage:/app/storage seqtrainer-benchlab
+```
+
+Do not bind this app to a public interface or deploy it as an open multi-user website. It is
+intended for local use because uploaded datasets and predictions can contain sensitive
+research data.
 
 ## Data Format
 
@@ -156,7 +166,7 @@ SBOL/XML files are parsed for the first `sbol:elements` sequence and available n
 
 ## Reproducibility
 
-Every run writes artifacts to `storage/runs/<run_id>`:
+Every local run writes artifacts to `storage/runs/<run_id>` when storage is persistent:
 
 - `metrics.json`
 - `predictions.csv`
@@ -168,17 +178,29 @@ Every run writes artifacts to `storage/runs/<run_id>`:
 
 Uploaded source datasets are deleted automatically after a successful benchmark run by default.
 The run keeps the dataset manifest, metrics, predictions, and configs, but not the uploaded
-raw dataset file. To keep uploaded datasets during development, set:
+raw dataset file. Runtime data is ignored by git.
+
+To keep uploaded datasets during development, set:
 
 ```text
 DELETE_DATASETS_AFTER_RUN=false
 ```
 
+To wipe local user data, stop the app and delete:
+
+```text
+storage/datasets
+storage/runs
+```
+
+The current repository has been scrubbed of previous local run artifacts and uploaded
+datasets.
+
 ## Email Results
 
-The Results screen can email a run summary and export link.
+The Results screen can prepare a local email summary and export link.
 
-For hosted SMTP delivery, configure these environment variables:
+For optional SMTP delivery on your own machine, configure these environment variables:
 
 ```text
 SMTP_HOST
@@ -194,4 +216,7 @@ If SMTP is not configured, the app opens a prefilled email draft using the user'
 ## Notes
 
 This branch deliberately avoids notebooks and hardcoded research paths. The first goal is a
-stable web service contract that can later call richer SeqTrainer model backends.
+stable local tool contract that can later call richer SeqTrainer model backends.
+
+This app does not include authentication, accounts, or multi-user isolation. Keep it local
+unless those features are added.

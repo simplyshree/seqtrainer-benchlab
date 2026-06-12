@@ -308,7 +308,7 @@ def make_benchmark_plan(request: BenchmarkPlanRequest | BenchmarkRequest, datase
             "summary_required_before_training": True,
         },
         "models": {
-            "hosted_small_run": request.models,
+            "local_quick_run": request.models,
             "colab_hpc_comparison": request.comparison_models,
             "notes": "CNN, DNABERT2, and iPro-MP are exported as reproducible Colab/HPC protocol targets.",
         },
@@ -422,7 +422,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "suggested_target_col": suggested_target_col,
         "target_summary": summarize_target(df, suggested_target_col),
         "large_dataset_warning": int(len(df)) > DEFAULT_SMALL_DATASET_LIMIT,
-        "hosted_small_run_limit": DEFAULT_SMALL_DATASET_LIMIT,
+        "local_small_run_limit": DEFAULT_SMALL_DATASET_LIMIT,
         "sha256": file_sha256(raw_path),
         "source_format": raw_path.suffix.lower(),
     }
@@ -579,7 +579,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "sequence_col": request.sequence_col,
         "target_col": target_col,
         "rows_uploaded": int(dataset_manifest.get("row_count", source_rows)),
-        "hosted_row_limit": request.max_rows,
+        "local_row_limit": request.max_rows,
         "row_cap_applied": row_cap_applied,
         "class_balance_strategy": request.balance_strategy,
         "class_balance_applied": class_balance_applied,
