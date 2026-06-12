@@ -314,6 +314,58 @@ p,
   grid-template-columns: minmax(300px, 0.9fr) minmax(320px, 1.1fr);
 }
 
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.mode-card {
+  min-width: 0;
+  display: grid;
+  gap: 13px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 1px 0 rgb(23 33 43 / 3%);
+}
+
+.mode-card.selected {
+  border-color: #83c9b4;
+  box-shadow: 0 14px 36px rgb(36 116 95 / 13%);
+}
+
+.mode-card span {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mode-card strong {
+  color: var(--ink);
+  font-size: 22px;
+}
+
+.mode-card p {
+  color: #405162;
+  line-height: 1.5;
+}
+
+.mode-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+body[data-mode="beginner"] .advanced-only {
+  display: none !important;
+}
+
 .surface {
   min-width: 0;
   border: 1px solid var(--line);
@@ -921,6 +973,7 @@ th {
 
   .summary-strip,
   .grid.two,
+  .mode-grid,
   .control-grid,
   .option-grid,
   .model-list,

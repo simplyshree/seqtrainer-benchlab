@@ -2,6 +2,7 @@ let currentDatasetId = null;
 let currentRunId = null;
 let currentDataset = null;
 let currentPlan = null;
+let currentMode = localStorage.getItem("seqtrainerBenchLabMode") || "beginner";
 
 const toast = document.querySelector("#toast");
 const previewLabels = {
@@ -41,6 +42,18 @@ function goToPanel(panelName) {
   document.querySelectorAll(".nav-button").forEach((item) => item.classList.toggle("active", item.dataset.panel === panelName));
   document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("visible"));
   document.querySelector(`#panel-${panelName}`).classList.add("visible");
+}
+
+function applyWorkflowMode(mode, navigate = false) {
+  currentMode = mode;
+  localStorage.setItem("seqtrainerBenchLabMode", mode);
+  document.body.dataset.mode = mode;
+  document.querySelectorAll(".mode-card").forEach((card) => card.classList.remove("selected"));
+  document.querySelector(`#mode-card-${mode}`)?.classList.add("selected");
+  if (navigate) {
+    showToast(mode === "advanced" ? "Advanced mode enabled." : "Beginner mode enabled.");
+    goToPanel("dataset");
+  }
 }
 
 async function withLoading(button, fn) {
@@ -266,6 +279,10 @@ function renderCapabilities(data) {
 
 document.querySelectorAll(".nav-button").forEach((button) => {
   button.addEventListener("click", () => goToPanel(button.dataset.panel));
+});
+
+document.querySelectorAll("[data-mode-choice]").forEach((button) => {
+  button.addEventListener("click", () => applyWorkflowMode(button.dataset.modeChoice, true));
 });
 
 const fileInputEl = document.querySelector("#dataset-file");
@@ -634,4 +651,5 @@ document.querySelector("#email-form").addEventListener("submit", async (event) =
 checkHealth();
 api("/api/capabilities").then(renderCapabilities).catch(() => {});
 loadRuns().catch(() => {});
+applyWorkflowMode(currentMode, false);
 updateBenchmarkPreview();

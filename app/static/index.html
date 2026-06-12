@@ -16,7 +16,8 @@
         </div>
       </div>
       <nav aria-label="Workflow">
-        <button class="nav-button active" data-panel="dataset"><span>1</span> Dataset</button>
+        <button class="nav-button active" data-panel="mode"><span>0</span> Start</button>
+        <button class="nav-button" data-panel="dataset"><span>1</span> Dataset</button>
         <button class="nav-button" data-panel="preprocess"><span>2</span> Preprocess</button>
         <button class="nav-button" data-panel="benchmark"><span>3</span> Benchmark</button>
         <button class="nav-button" data-panel="results"><span>4</span> Results</button>
@@ -60,7 +61,43 @@
         </div>
       </section>
 
-      <section id="panel-dataset" class="panel visible">
+      <section id="panel-mode" class="panel visible">
+        <div class="section-head">
+          <div>
+            <h2>Choose Workflow Mode</h2>
+            <p>Start simple for teaching and quick checks, or open the full research planner.</p>
+          </div>
+          <span class="format-list">beginner or advanced</span>
+        </div>
+        <div class="mode-grid">
+          <article class="mode-card selected" id="mode-card-beginner">
+            <span>Beginner Student Mode</span>
+            <strong>Simple benchmark path</strong>
+            <p>Best for students and first-time users. Upload sequence + label data, use recommended preprocessing, run a small baseline, and view key metrics without extra settings.</p>
+            <ul>
+              <li>Recommended defaults</li>
+              <li>Minimal controls</li>
+              <li>Clear dataset warnings</li>
+              <li>Easy metric cards</li>
+            </ul>
+            <button type="button" data-mode-choice="beginner">Use Beginner Mode</button>
+          </article>
+          <article class="mode-card" id="mode-card-advanced">
+            <span>Advanced Research Mode</span>
+            <strong>Full benchmark planner</strong>
+            <p>Best for scientists preparing reproducible CNN, DNABERT2, iPro-MP, Colab, Docker, or HPC comparison workflows.</p>
+            <ul>
+              <li>Split, CV, seeds, cycles</li>
+              <li>Threshold and class balancing</li>
+              <li>Model target controls</li>
+              <li>JSON import/export and Codex prompt</li>
+            </ul>
+            <button type="button" class="secondary" data-mode-choice="advanced">Use Advanced Mode</button>
+          </article>
+        </div>
+      </section>
+
+      <section id="panel-dataset" class="panel">
         <div class="section-head">
           <div>
             <h2>Dataset</h2>
@@ -130,7 +167,7 @@
             <div class="control-grid compact-grid">
               <label>Sequence Column <input id="sequence-col" value="sequence" /></label>
             </div>
-            <details class="advanced-box">
+            <details class="advanced-box advanced-only">
               <summary>Advanced preprocessing</summary>
               <div class="control-grid">
                 <label>K-mer Size <input id="kmer-size" type="number" min="1" max="6" value="4" /></label>
@@ -150,7 +187,7 @@
               <h3>Feature Summary</h3>
               <div id="feature-summary" class="callout">No preprocessing preview yet.</div>
             </div>
-            <details class="advanced-box">
+            <details class="advanced-box advanced-only">
               <summary>SeqTrainer functions used</summary>
               <div id="capability-list" class="capability-list"></div>
             </details>
@@ -205,9 +242,9 @@
           </div>
           <div class="action-row">
             <button type="submit">Run Small Local Benchmark</button>
-            <button id="generate-plan" type="button" class="secondary">Create Colab/HPC Plan</button>
+            <button id="generate-plan" type="button" class="secondary advanced-only">Create Colab/HPC Plan</button>
           </div>
-          <details class="advanced-box">
+          <details class="advanced-box advanced-only">
             <summary>Advanced benchmark settings</summary>
             <div class="control-grid">
               <label>Test Size <input id="test-size" type="number" min="0.1" max="0.5" step="0.05" value="0.2" /></label>
@@ -258,7 +295,7 @@
               </label>
             </div>
           </details>
-          <details class="advanced-box">
+          <details class="advanced-box advanced-only">
             <summary>Change local baseline models</summary>
             <h3>Runnable Models</h3>
             <div id="live-models" class="model-list">
@@ -267,7 +304,7 @@
               <label class="model-card"><input class="model-option" type="checkbox" value="gradient_boosting" /><span><strong>Gradient Boosting</strong><small>sklearn_tuning gbr</small></span></label>
             </div>
           </details>
-          <details class="advanced-box">
+          <details class="advanced-box advanced-only">
             <summary>Change Colab/HPC comparison models</summary>
             <h3>Colab/HPC Comparison Plan</h3>
             <div class="model-list">
@@ -276,7 +313,7 @@
               <label class="model-card"><input class="comparison-model-option" type="checkbox" value="ipro_mp" checked /><span><strong>iPro-MP</strong><small>External inference target</small></span></label>
             </div>
           </details>
-          <div class="planner-box">
+          <div class="planner-box advanced-only">
             <div class="planner-actions">
               <label class="import-config">Import JSON <input id="config-json-file" type="file" accept=".json,application/json" /></label>
               <button id="download-plan" type="button" class="secondary" disabled>Download JSON</button>
