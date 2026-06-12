@@ -387,6 +387,46 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
 function renderMetrics(metrics) {
   const rows = Object.entries(metrics).map(([model, values]) => ({ model, ...values }));
   renderTable(document.querySelector("#metrics-table"), rows);
+  renderMetricSummary(metrics);
+}
+
+function formatMetricValue(value) {
+  if (typeof value !== "number") return value ?? "-";
+  if (Math.abs(value) >= 100) return Math.round(value).toString();
+  return Number(value.toFixed(4)).toString();
+}
+
+function renderMetricSummary(metrics) {
+  const target = document.querySelector("#metrics-summary");
+  target.innerHTML = "";
+  const entries = Object.entries(metrics || {});
+  if (!entries.length) {
+    target.classList.add("empty-state");
+    target.textContent = "No metrics yet.";
+    return;
+  }
+  target.classList.remove("empty-state");
+
+  entries.forEach(([model, values]) => {
+    const classificationKeys = ["accuracy", "precision", "recall", "f1", "mcc"];
+    const regressionKeys = ["mae", "rmse", "r2", "train_rows", "test_rows"];
+    const keys = classificationKeys.every((key) => key in values) ? classificationKeys : regressionKeys.filter((key) => key in values);
+    const card = document.createElement("article");
+    card.className = "metric-card";
+    const title = document.createElement("div");
+    title.className = "metric-card-title";
+    title.innerHTML = `<strong>${model.replaceAll("_", " ")}</strong><span>${values.task_type || "benchmark"}</span>`;
+    const grid = document.createElement("div");
+    grid.className = "metric-pill-grid";
+    keys.slice(0, 5).forEach((key) => {
+      const pill = document.createElement("div");
+      pill.className = "metric-pill";
+      pill.innerHTML = `<span>${key.replaceAll("_", " ")}</span><strong>${formatMetricValue(values[key])}</strong>`;
+      grid.append(pill);
+    });
+    card.append(title, grid);
+    target.append(card);
+  });
 }
 
 function renderRunDetails(payload) {

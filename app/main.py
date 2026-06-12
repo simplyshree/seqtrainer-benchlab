@@ -24,6 +24,7 @@ from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
     f1_score,
+    matthews_corrcoef,
     mean_absolute_error,
     mean_squared_error,
     precision_score,
@@ -173,6 +174,7 @@ def build_run_email_body(run_id: str, base_url: str) -> str:
             "precision",
             "recall",
             "f1",
+            "mcc",
             "train_rows",
             "test_rows",
         ]:
@@ -551,6 +553,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
                     "precision": float(precision_score(actual_classes, predicted_classes, zero_division=0)),
                     "recall": float(recall_score(actual_classes, predicted_classes, zero_division=0)),
                     "f1": float(f1_score(actual_classes, predicted_classes, zero_division=0)),
+                    "mcc": float(matthews_corrcoef(actual_classes, predicted_classes)),
                     "true_negative": int(tn),
                     "false_positive": int(fp),
                     "false_negative": int(fn),

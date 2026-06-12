@@ -401,6 +401,71 @@ p,
   background: #f4f7fa;
 }
 
+.metrics-surface {
+  border-color: #c8d8e8;
+}
+
+.metric-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #ced9e4;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.metric-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.metric-card-title strong {
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+.metric-card-title span {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.metric-pill-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metric-pill {
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 9px;
+  border-radius: 8px;
+  background: #eef5f8;
+}
+
+.metric-pill span {
+  color: #536578;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.metric-pill strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
 .analysis-card {
   display: grid;
   gap: 7px;
@@ -861,6 +926,7 @@ th {
   .model-list,
   .planned-models,
   .protocol-preview,
+  .metric-pill-grid,
   .email-form {
     grid-template-columns: 1fr;
   }
