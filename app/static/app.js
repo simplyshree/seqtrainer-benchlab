@@ -208,6 +208,7 @@ function benchmarkPayload() {
     max_rows: Number(document.querySelector("#max-rows").value),
     reruns: Number(document.querySelector("#reruns").value),
     cv_folds: Number(document.querySelector("#cv-folds").value),
+    training_cycles: Number(document.querySelector("#training-cycles").value),
     early_stopping_patience: Number(document.querySelector("#early-stopping-patience").value),
   };
 }
@@ -238,7 +239,7 @@ function updateBenchmarkPreview() {
       : "Upload data to see hosted-run limits and class readiness."
   );
   setText("#preview-split-plan", optionText("#split-strategy"));
-  setText("#preview-split-detail", `Test ${payload.test_size}, validation ${payload.validation_size}, seed ${payload.random_seed}, reruns ${payload.reruns}.`);
+  setText("#preview-split-detail", `Test ${payload.test_size}, validation ${payload.validation_size}, seed ${payload.random_seed}, ${payload.cv_folds}-fold CV, ${payload.reruns} reruns, ${payload.training_cycles} cycles.`);
   setText("#preview-threshold-rule", optionText("#threshold-strategy"));
   setText("#preview-threshold-detail", `${optionText("#threshold-scope")}; goal: ${optionText("#biological-goal")}${payload.threshold_value !== null ? `; value ${payload.threshold_value}` : ""}.`);
   const comparison = payload.comparison_models.length ? payload.comparison_models.join(", ") : "No Colab/HPC models selected";
@@ -458,6 +459,9 @@ function renderRunDetails(payload) {
     threshold: training.classification_threshold ?? training.threshold_strategy ?? "not used",
     random_seed: training.random_seed ?? "-",
     reruns: training.reruns ?? "-",
+    cv_folds: training.cv_folds ?? "-",
+    training_cycles: training.training_cycles ?? "-",
+    early_stopping_patience: training.early_stopping_patience ?? "-",
     preprocessing: preprocessingText,
     data_cleanup: cleanup,
   });
@@ -560,6 +564,7 @@ function applyImportedConfig(plan) {
   setIfPresent("#threshold-scope", threshold.scope);
   setIfPresent("#biological-goal", threshold.biological_goal);
   setIfPresent("#balance-strategy", balance.strategy);
+  setIfPresent("#training-cycles", training.training_cycles);
   setIfPresent("#early-stopping-patience", training.early_stopping_patience);
   updateBenchmarkPreview();
 }

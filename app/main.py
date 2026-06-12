@@ -105,6 +105,7 @@ class BenchmarkRequest(BaseModel):
     max_rows: int = DEFAULT_SMALL_DATASET_LIMIT
     reruns: int = 3
     cv_folds: int = 5
+    training_cycles: int = 20
     early_stopping_patience: int = 5
 
 
@@ -312,6 +313,7 @@ def make_benchmark_plan(request: BenchmarkPlanRequest | BenchmarkRequest, datase
             "notes": "CNN, DNABERT2, and iPro-MP are exported as reproducible Colab/HPC protocol targets.",
         },
         "training": {
+            "training_cycles": request.training_cycles,
             "early_stopping_patience": request.early_stopping_patience,
             "package_versions_required": True,
             "docker_recommended": True,
@@ -592,6 +594,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "comparison_models_for_colab_hpc": request.comparison_models,
         "reruns": request.reruns,
         "cv_folds": request.cv_folds,
+        "training_cycles": request.training_cycles,
         "early_stopping_patience": request.early_stopping_patience,
     }
     benchmark_plan = make_benchmark_plan(request, dataset_manifest)

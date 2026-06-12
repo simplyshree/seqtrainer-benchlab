@@ -21,7 +21,7 @@ This MVP is intentionally deployable as a single FastAPI service with static fro
   - Random Forest
   - Gradient Boosting
 - Show train/test split size, seed, selected columns, preprocessing config, and data cleanup status after each run
-- Configure split strategy, validation size, reruns, CV folds, early stopping patience, threshold policy, and class balancing
+- Configure split strategy, validation size, reruns, CV folds, training cycles/epochs, early stopping patience, threshold policy, and class balancing
 - For 0/1 labels, report thresholded classification metrics alongside the current-main regression baselines:
   - Accuracy
   - Precision
@@ -58,6 +58,7 @@ The exported plan records:
 - shared or per-model threshold policy
 - class imbalance summary and optional balancing strategy
 - reruns/seeds, CV folds, and early stopping patience
+- training cycles/epochs for future CNN, DNABERT2, iPro-MP, Docker, Colab, or HPC runners
 - CNN, DNABERT2, and iPro-MP as Colab/HPC comparison targets
 - required artifacts for future reproducibility
 
