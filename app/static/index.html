@@ -95,6 +95,9 @@
             <button type="button" class="secondary" data-mode-choice="advanced">Use Advanced Mode</button>
           </article>
         </div>
+        <div class="step-footer">
+          <button type="button" class="next-step glow-next" data-next-panel="dataset">Next: Upload Dataset</button>
+        </div>
       </section>
 
       <section id="panel-dataset" class="panel">
@@ -138,7 +141,6 @@
               <div><span>Columns</span><strong id="dataset-cols">-</strong></div>
               <div><span>Format</span><strong id="dataset-format">-</strong></div>
             </div>
-            <button id="continue-preprocess" type="button" class="secondary" disabled>Continue to Preprocess</button>
           </div>
         </div>
         <div class="surface">
@@ -150,6 +152,9 @@
             </div>
           </div>
           <div id="dataset-preview" class="table-wrap empty-state">No dataset loaded.</div>
+        </div>
+        <div class="step-footer">
+          <button id="continue-preprocess" type="button" class="next-step glow-next" disabled>Next: Preprocess</button>
         </div>
       </section>
 
@@ -202,6 +207,9 @@
             </div>
           </div>
           <div id="feature-preview" class="table-wrap empty-state">Run preprocessing preview to inspect generated columns.</div>
+        </div>
+        <div class="step-footer">
+          <button id="continue-benchmark" type="button" class="next-step glow-next" disabled>Next: Benchmark</button>
         </div>
       </section>
 
@@ -322,6 +330,9 @@
             <textarea id="plan-output" class="hidden" readonly placeholder="Generated benchmarking JSON and Codex prompt will appear here."></textarea>
           </div>
         </form>
+        <div class="step-footer">
+          <button id="continue-results" type="button" class="next-step glow-next" disabled>Next: Results</button>
+        </div>
       </section>
 
       <section id="panel-results" class="panel">
@@ -370,6 +381,9 @@
             </div>
           </div>
           <div id="predictions-table" class="table-wrap empty-state">No predictions yet.</div>
+        </div>
+        <div class="step-footer">
+          <button type="button" class="next-step glow-next" data-next-panel="dataset">Start Another Dataset</button>
         </div>
       </section>
     </main>

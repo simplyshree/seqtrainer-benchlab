@@ -282,6 +282,10 @@ document.querySelectorAll(".nav-button").forEach((button) => {
   button.addEventListener("click", () => goToPanel(button.dataset.panel));
 });
 
+document.querySelectorAll("[data-next-panel]").forEach((button) => {
+  button.addEventListener("click", () => goToPanel(button.dataset.nextPanel));
+});
+
 document.querySelectorAll("[data-mode-choice]").forEach((button) => {
   button.addEventListener("click", () => applyWorkflowMode(button.dataset.modeChoice, true));
 });
@@ -338,6 +342,22 @@ document.querySelector("#continue-preprocess").addEventListener("click", () => {
   goToPanel("preprocess");
 });
 
+document.querySelector("#continue-benchmark").addEventListener("click", () => {
+  if (document.querySelector("#continue-benchmark").disabled) {
+    showToast("Preview features first.");
+    return;
+  }
+  goToPanel("benchmark");
+});
+
+document.querySelector("#continue-results").addEventListener("click", () => {
+  if (!currentRunId) {
+    showToast("Run a benchmark first.");
+    return;
+  }
+  goToPanel("results");
+});
+
 document.querySelector("#preprocess-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!currentDatasetId) {
@@ -356,6 +376,7 @@ document.querySelector("#preprocess-form").addEventListener("submit", async (eve
       setText("#state-features", `${data.feature_count} features`);
       setText("#feature-count", `${data.feature_count} generated columns`);
       renderPreviewTable(document.querySelector("#feature-preview"), data.preview);
+      document.querySelector("#continue-benchmark").disabled = false;
       showToast("Feature preview ready.");
       goToPanel("benchmark");
     } catch (error) {
@@ -394,6 +415,7 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
       renderPreviewTable(document.querySelector("#predictions-table"), data.predictions);
       setExportLink(currentRunId);
       setText("#state-run", currentRunId.slice(0, 8));
+      document.querySelector("#continue-results").disabled = false;
       await loadRuns();
       showToast(data.dataset_removed ? "Benchmark complete. Uploaded dataset was deleted after run." : "Benchmark complete.");
       goToPanel("results");
