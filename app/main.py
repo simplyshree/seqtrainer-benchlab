@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import smtplib
 import shutil
 import uuid
@@ -10,12 +11,12 @@ from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import joblib
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -38,10 +39,18 @@ from .seqtrainer_core import build_features, file_sha256, read_dataset
 
 APP_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = APP_ROOT.parent
-STORAGE_ROOT = Path(os.getenv("SEQTRAINER_STORAGE", REPO_ROOT / "storage"))
+STORAGE_ROOT = Path(os.getenv("SEQTRAINER_STORAGE", REPO_ROOT / "storage")).expanduser().resolve()
 DATASETS_ROOT = STORAGE_ROOT / "datasets"
 RUNS_ROOT = STORAGE_ROOT / "runs"
+DEFAULT_SMALL_DATASET_LIMIT = 1000
 DELETE_DATASETS_AFTER_RUN = os.getenv("DELETE_DATASETS_AFTER_RUN", "true").lower() not in {"0", "false", "no"}
+MAX_UPLOAD_BYTES = int(os.getenv("SEQTRAINER_MAX_UPLOAD_MB", "50")) * 1024 * 1024
+MAX_LOCAL_RUN_ROWS = int(os.getenv("SEQTRAINER_MAX_LOCAL_ROWS", str(DEFAULT_SMALL_DATASET_LIMIT)))
+MAX_KMER_SIZE = int(os.getenv("SEQTRAINER_MAX_KMER_SIZE", "6"))
+MAX_ONE_HOT_LENGTH = int(os.getenv("SEQTRAINER_MAX_ONE_HOT_LENGTH", "1000"))
+ALLOWED_DATASET_EXTENSIONS = {".csv", ".tsv", ".txt", ".fa", ".fasta", ".xml", ".rdf", ".sbol"}
+ID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+LOCAL_ORIGIN_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 MODEL_MAP = {
     "linear_regression": LinearRegression,
@@ -50,7 +59,6 @@ MODEL_MAP = {
 }
 
 TARGET_COLUMN_CANDIDATES = ["target", "label", "y", "class", "promoter", "expression", "expn_med"]
-DEFAULT_SMALL_DATASET_LIMIT = 1000
 
 SEQTRAINER_SOURCE = {
     "repository": "SynBioDex/SeqTrainer",
@@ -92,21 +100,21 @@ class BenchmarkRequest(BaseModel):
     target_col: str = "target"
     models: list[str] = Field(default_factory=lambda: ["linear_regression"])
     comparison_models: list[str] = Field(default_factory=lambda: ["cnn", "dnabert2", "ipro_mp"])
-    preprocessing: dict[str, Any] = Field(default_factory=lambda: {"use_gc": True, "use_kmers": True, "kmer_size": 4})
-    test_size: float = 0.2
-    validation_size: float = 0.1
-    random_seed: int = 42
+    preprocessing: dict[str, Any] = Field(default_factory=lambda: {"use_gc": True, "use_kmers": True, "kmer_size": 6})
+    test_size: float = Field(default=0.2, ge=0.05, le=0.5)
+    validation_size: float = Field(default=0.1, ge=0.0, le=0.4)
+    random_seed: int = Field(default=42, ge=0, le=2_147_483_647)
     split_strategy: str = "fixed_train_validation_test"
     threshold_strategy: str = "user_or_literature"
     threshold_value: float | None = None
     threshold_scope: str = "shared"
     biological_goal: str = "limit_false_positives"
     balance_strategy: str = "none"
-    max_rows: int = DEFAULT_SMALL_DATASET_LIMIT
-    reruns: int = 3
-    cv_folds: int = 5
-    training_cycles: int = 20
-    early_stopping_patience: int = 5
+    max_rows: int = Field(default=DEFAULT_SMALL_DATASET_LIMIT, ge=5, le=MAX_LOCAL_RUN_ROWS)
+    reruns: int = Field(default=3, ge=1, le=100)
+    cv_folds: int = Field(default=5, ge=2, le=10)
+    training_cycles: int = Field(default=20, ge=1, le=1000)
+    early_stopping_patience: int = Field(default=5, ge=0, le=50)
 
 
 class BenchmarkPlanRequest(BenchmarkRequest):
@@ -127,11 +135,11 @@ def ensure_storage() -> None:
 
 
 def dataset_dir(dataset_id: str) -> Path:
-    return DATASETS_ROOT / dataset_id
+    return DATASETS_ROOT / validate_storage_id(dataset_id, "Dataset")
 
 
 def run_dir(run_id: str) -> Path:
-    return RUNS_ROOT / run_id
+    return RUNS_ROOT / validate_storage_id(run_id, "Run")
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -140,6 +148,80 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def validate_storage_id(value: str, resource_name: str) -> str:
+    if not ID_PATTERN.fullmatch(value):
+        raise HTTPException(status_code=404, detail=f"{resource_name} not found")
+    return value
+
+
+def safe_dataset_filename(filename: str | None) -> str:
+    path = Path(filename or "dataset").name
+    suffix = Path(path).suffix.lower()
+    if suffix not in ALLOWED_DATASET_EXTENSIONS:
+        supported = ", ".join(sorted(ALLOWED_DATASET_EXTENSIONS))
+        raise HTTPException(status_code=400, detail=f"Unsupported dataset format: {suffix or 'missing extension'}. Supported: {supported}")
+
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(path).stem).strip("._-")[:80]
+    return f"{stem or 'dataset'}{suffix}"
+
+
+def save_upload_file(file: UploadFile, destination: Path) -> int:
+    bytes_written = 0
+    with destination.open("wb") as handle:
+        while chunk := file.file.read(1024 * 1024):
+            bytes_written += len(chunk)
+            if bytes_written > MAX_UPLOAD_BYTES:
+                max_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
+                raise HTTPException(status_code=413, detail=f"Dataset upload is too large. Maximum allowed size is {max_mb} MB.")
+            handle.write(chunk)
+    return bytes_written
+
+
+def parse_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def bounded_int(value: Any, default: int, minimum: int, maximum: int, name: str) -> int:
+    try:
+        parsed = int(value if value is not None else default)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"{name} must be an integer.") from exc
+    if parsed < minimum or parsed > maximum:
+        raise HTTPException(status_code=400, detail=f"{name} must be between {minimum} and {maximum}.")
+    return parsed
+
+
+def sanitize_preprocessing(config: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(config, dict):
+        raise HTTPException(status_code=400, detail="Preprocessing config must be a JSON object.")
+
+    sanitized = {
+        "use_gc": parse_bool(config.get("use_gc"), True),
+        "use_kmers": parse_bool(config.get("use_kmers"), True),
+        "normalize_kmers": parse_bool(config.get("normalize_kmers"), True),
+        "use_one_hot": parse_bool(config.get("use_one_hot"), False),
+        "kmer_size": bounded_int(config.get("kmer_size"), 6, 1, MAX_KMER_SIZE, "kmer_size"),
+        "sequence_length": bounded_int(config.get("sequence_length"), 150, 20, MAX_ONE_HOT_LENGTH, "sequence_length"),
+    }
+    if not any([sanitized["use_gc"], sanitized["use_kmers"], sanitized["use_one_hot"]]):
+        raise HTTPException(status_code=400, detail="Select at least one preprocessing feature family.")
+    return sanitized
+
+
+def is_allowed_local_origin(origin: str) -> bool:
+    allowed_origins = {item.strip() for item in os.getenv("SEQTRAINER_ALLOWED_ORIGINS", "").split(",") if item.strip()}
+    if origin in allowed_origins:
+        return True
+    parsed = urlparse(origin)
+    return parsed.scheme in {"http", "https"} and parsed.hostname in LOCAL_ORIGIN_HOSTS
 
 
 def build_run_email_body(run_id: str, base_url: str) -> str:
@@ -277,7 +359,7 @@ def make_benchmark_plan(request: BenchmarkPlanRequest | BenchmarkRequest, datase
             "original_name": dataset_manifest.get("original_name"),
             "sha256": dataset_manifest.get("sha256"),
             "rows_uploaded": dataset_manifest.get("row_count"),
-            "large_dataset_policy": f"Hosted small-run mode uses first {request.max_rows} rows unless run on Colab/HPC.",
+            "large_dataset_policy": f"Local quick-run mode uses first {request.max_rows} rows unless run on Colab/HPC.",
             "analysis": dataset_manifest.get("target_summary", {}),
         },
         "columns": {
@@ -301,7 +383,7 @@ def make_benchmark_plan(request: BenchmarkPlanRequest | BenchmarkRequest, datase
             "biological_goal": request.biological_goal,
             "false_positive_cost": "high",
         },
-        "preprocessing": request.preprocessing,
+        "preprocessing": sanitize_preprocessing(request.preprocessing),
         "class_balance": {
             "strategy": request.balance_strategy,
             "activate_only_if_imbalanced": True,
@@ -373,6 +455,22 @@ def maybe_balance_binary_rows(df: pd.DataFrame, target_col: str, strategy: str, 
 app = FastAPI(title="SeqTrainer BenchLab", version="0.1.0")
 
 
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin")
+        if origin and not is_allowed_local_origin(origin):
+            return JSONResponse(status_code=403, content={"detail": "Origin not allowed for this local BenchLab instance."})
+
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     ensure_storage()
@@ -391,14 +489,17 @@ def capabilities() -> dict[str, Any]:
 @app.post("/api/datasets")
 async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     ensure_storage()
+    original_name = safe_dataset_filename(file.filename)
     dataset_id = str(uuid.uuid4())
     folder = dataset_dir(dataset_id)
     folder.mkdir(parents=True, exist_ok=True)
 
-    original_name = Path(file.filename or "dataset").name
     raw_path = folder / original_name
-    with raw_path.open("wb") as handle:
-        shutil.copyfileobj(file.file, handle)
+    try:
+        upload_bytes = save_upload_file(file, raw_path)
+    except HTTPException:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
 
     try:
         df = read_dataset(raw_path)
@@ -421,10 +522,11 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "suggested_sequence_col": infer_column(list(df.columns), ["sequence", "seq", "variant", "dna"]),
         "suggested_target_col": suggested_target_col,
         "target_summary": summarize_target(df, suggested_target_col),
-        "large_dataset_warning": int(len(df)) > DEFAULT_SMALL_DATASET_LIMIT,
-        "local_small_run_limit": DEFAULT_SMALL_DATASET_LIMIT,
+        "large_dataset_warning": int(len(df)) > MAX_LOCAL_RUN_ROWS,
+        "local_small_run_limit": MAX_LOCAL_RUN_ROWS,
         "sha256": file_sha256(raw_path),
         "source_format": raw_path.suffix.lower(),
+        "upload_bytes": upload_bytes,
     }
     write_json(folder / "dataset_manifest.json", manifest)
     return {"dataset": manifest, "preview": df.head(20).fillna("").to_dict(orient="records")}
@@ -452,7 +554,11 @@ def preview_preprocessing(dataset_id: str, sequence_col: str = Form("sequence"),
     df, _ = load_dataset(dataset_id)
     if sequence_col not in df.columns:
         raise HTTPException(status_code=400, detail=f"Column not found: {sequence_col}")
-    parsed_config = json.loads(config)
+    try:
+        parsed_config = json.loads(config)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Preprocessing config must be valid JSON.") from exc
+    parsed_config = sanitize_preprocessing(parsed_config)
     features = build_features(df, sequence_col, parsed_config)
     return {
         "feature_count": int(features.shape[1]),
@@ -488,15 +594,12 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     if unknown_models:
         raise HTTPException(status_code=400, detail=f"Unsupported model(s): {', '.join(unknown_models)}")
 
+    preprocessing_config = sanitize_preprocessing(request.preprocessing)
     source_rows = int(len(df))
     df, row_cap_applied = maybe_cap_rows(df, request.max_rows)
     df, class_balance_applied = maybe_balance_binary_rows(df, target_col, request.balance_strategy, request.random_seed)
 
-    run_id = str(uuid.uuid4())
-    folder = run_dir(run_id)
-    folder.mkdir(parents=True, exist_ok=True)
-
-    features = build_features(df, request.sequence_col, request.preprocessing)
+    features = build_features(df, request.sequence_col, preprocessing_config)
     target = pd.to_numeric(df[target_col], errors="coerce")
     valid_mask = target.notna()
     features = features.loc[valid_mask].reset_index(drop=True)
@@ -515,6 +618,10 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     test_rows = int(len(X_test))
     rows_used = int(len(features))
     binary_target = is_binary_numeric_target(target)
+
+    run_id = str(uuid.uuid4())
+    folder = run_dir(run_id)
+    folder.mkdir(parents=True, exist_ok=True)
 
     metrics: dict[str, Any] = {}
     prediction_frames = []
@@ -597,7 +704,12 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "training_cycles": request.training_cycles,
         "early_stopping_patience": request.early_stopping_patience,
     }
-    benchmark_plan = make_benchmark_plan(request, dataset_manifest)
+    request_for_plan = (
+        request.model_copy(update={"preprocessing": preprocessing_config})
+        if hasattr(request, "model_copy")
+        else request.copy(update={"preprocessing": preprocessing_config})
+    )
+    benchmark_plan = make_benchmark_plan(request_for_plan, dataset_manifest)
     run_manifest = {
         "run_id": run_id,
         "created_at": utc_now(),
@@ -622,7 +734,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
 
     write_json(folder / "metrics.json", metrics)
     write_json(folder / "dataset_manifest.json", dataset_manifest)
-    write_json(folder / "preprocessing_config.json", request.preprocessing)
+    write_json(folder / "preprocessing_config.json", preprocessing_config)
     write_json(folder / "training_config.json", training_config)
     write_json(folder / "benchmark_plan.json", benchmark_plan)
     write_json(folder / "run_manifest.json", run_manifest)
@@ -640,7 +752,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "predictions": predictions_df.head(50).round(6).to_dict(orient="records"),
         "dataset": dataset_manifest,
         "training_config": training_config,
-        "preprocessing_config": request.preprocessing,
+        "preprocessing_config": preprocessing_config,
         "benchmark_plan": benchmark_plan,
         "codex_prompt": make_codex_prompt(benchmark_plan),
         "dataset_removed": dataset_removed,

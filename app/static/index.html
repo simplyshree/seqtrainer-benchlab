@@ -170,7 +170,7 @@
             <details class="advanced-box advanced-only">
               <summary>Advanced preprocessing</summary>
               <div class="control-grid">
-                <label>K-mer Size <input id="kmer-size" type="number" min="1" max="6" value="4" /></label>
+                <label>K-mer Size <input id="kmer-size" type="number" min="1" max="6" value="6" /></label>
                 <label>One-hot Length <input id="sequence-length" type="number" min="20" max="1000" value="150" /></label>
               </div>
               <div class="option-grid">
@@ -258,7 +258,7 @@
                 </select>
               </label>
               <label>Validation Size <input id="validation-size" type="number" min="0.05" max="0.4" step="0.05" value="0.1" /></label>
-              <label>Hosted Row Limit <input id="max-rows" type="number" min="100" step="100" value="1000" /></label>
+              <label>Local Row Limit <input id="max-rows" type="number" min="100" max="1000" step="100" value="1000" /></label>
               <label>Threshold Strategy
                 <select id="threshold-strategy">
                   <option value="user_or_literature">User/literature input</option>

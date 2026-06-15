@@ -152,6 +152,30 @@ Do not bind this app to a public interface or deploy it as an open multi-user we
 intended for local use because uploaded datasets and predictions can contain sensitive
 research data.
 
+## Local Security Model
+
+BenchLab includes local safety guardrails, but it is still not a hosted multi-user product.
+
+- The Docker image runs as a non-root user.
+- Uploaded source datasets are deleted after successful benchmark runs by default.
+- Runtime data under `storage/` is ignored by git and excluded from Docker builds.
+- Dataset and run IDs must be UUIDs, which prevents path traversal through API routes.
+- Uploads are limited to 50 MB by default.
+- Local quick runs are capped at 1000 rows by default.
+- Preprocessing settings are bounded on the backend, including k-mer size and one-hot length.
+- Browser write requests are allowed only from local origins unless explicitly configured.
+- API responses use basic security headers and no-store caching for `/api/*` responses.
+
+Optional local environment controls:
+
+```text
+SEQTRAINER_MAX_UPLOAD_MB=50
+SEQTRAINER_MAX_LOCAL_ROWS=1000
+SEQTRAINER_MAX_KMER_SIZE=6
+SEQTRAINER_MAX_ONE_HOT_LENGTH=1000
+SEQTRAINER_ALLOWED_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+```
+
 ## Data Format
 
 CSV/TSV files should contain:

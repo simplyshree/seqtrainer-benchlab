@@ -155,7 +155,7 @@ def build_features(df: pd.DataFrame, sequence_col: str, config: dict) -> pd.Data
     if config.get("use_gc", True):
         feature_frames.append(calc_gc(working, "sequence"))
 
-    k = int(config.get("kmer_size", 4))
+    k = int(config.get("kmer_size", 6))
     if config.get("use_kmers", True):
         feature_frames.append(generate_kmer_counts(working, "sequence", k=k, normalize=bool(config.get("normalize_kmers", True))))
 
