@@ -108,7 +108,7 @@
           </div>
           <span class="format-list">sequence + label</span>
         </div>
-        <div class="grid two">
+        <div class="grid two dataset-grid">
           <form id="upload-form" class="surface upload-panel">
             <label class="drop-zone" for="dataset-file" tabindex="0">
               <input id="dataset-file" type="file" accept=".csv,.tsv,.txt,.fa,.fasta,.xml,.rdf,.sbol" required />
@@ -127,11 +127,6 @@
             </div>
           </form>
           <div class="surface stack">
-            <div id="dataset-insight" class="analysis-card">
-              <span>Dataset Analysis</span>
-              <strong>Waiting for upload</strong>
-              <p>Upload a labeled dataset to analyze class balance and benchmark readiness.</p>
-            </div>
             <div>
               <h3>Current Dataset</h3>
               <dl id="dataset-meta" class="meta"></dl>
@@ -346,13 +341,23 @@
         <div class="surface stack metrics-surface">
           <div class="table-heading">
             <h3>Key Metrics</h3>
-            <span>Classification shows accuracy, precision, recall, F1, and MCC.</span>
+            <span>Shows all selected model metrics from this run.</span>
           </div>
           <div id="metrics-summary" class="metric-summary empty-state">No metrics yet.</div>
           <details class="advanced-box">
             <summary>All metric values</summary>
             <div id="metrics-table" class="table-wrap empty-state">No metrics yet.</div>
           </details>
+        </div>
+        <div class="surface stack">
+          <div class="table-heading">
+            <h3>Export Summary</h3>
+            <span>These values are included in the exported run bundle.</span>
+          </div>
+          <dl id="export-summary" class="meta detail-meta">
+            <dt>Status</dt>
+            <dd>No run selected.</dd>
+          </dl>
         </div>
         <div class="grid two">
           <div class="surface">

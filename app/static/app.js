@@ -166,7 +166,6 @@ function updateDatasetState(dataset) {
   }
 
   const summary = dataset.target_summary || {};
-  const insight = document.querySelector("#dataset-insight");
   const uploadAnalysis = document.querySelector("#upload-analysis");
   const guidance = document.querySelector("#benchmark-guidance");
   const localRunLimit = dataset.local_small_run_limit;
@@ -179,7 +178,6 @@ function updateDatasetState(dataset) {
     ? ` Local quick-run mode will use the first ${localRunLimit} rows unless you export the plan for Colab/HPC.`
     : "";
   const analysisMarkup = `<span>Dataset Analysis</span><strong>${summary.available ? "Labels detected" : "Needs target review"}</strong><p>${classText}${largeText}</p>`;
-  insight.innerHTML = analysisMarkup;
   uploadAnalysis.innerHTML = analysisMarkup;
   guidance.textContent = `${classText}${largeText} Default protocol: shared user/literature threshold, false positives treated as costly, 3 reruns, fixed materialized split.`;
   document.querySelector("#continue-preprocess").disabled = false;
@@ -450,8 +448,9 @@ function renderMetricSummary(metrics) {
 
   entries.forEach(([model, values]) => {
     const classificationKeys = ["accuracy", "precision", "recall", "f1", "mcc"];
-    const regressionKeys = ["mae", "rmse", "r2", "train_rows", "test_rows"];
-    const keys = classificationKeys.every((key) => key in values) ? classificationKeys : regressionKeys.filter((key) => key in values);
+    const metricKeys = Object.keys(values).filter((key) => key !== "task_type");
+    const priority = classificationKeys.filter((key) => key in values);
+    const keys = [...priority, ...metricKeys.filter((key) => !priority.includes(key))];
     const card = document.createElement("article");
     card.className = "metric-card";
     const title = document.createElement("div");
@@ -459,7 +458,7 @@ function renderMetricSummary(metrics) {
     title.innerHTML = `<strong>${model.replaceAll("_", " ")}</strong><span>${values.task_type || "benchmark"}</span>`;
     const grid = document.createElement("div");
     grid.className = "metric-pill-grid";
-    keys.slice(0, 5).forEach((key) => {
+    keys.forEach((key) => {
       const pill = document.createElement("div");
       pill.className = "metric-pill";
       pill.innerHTML = `<span>${key.replaceAll("_", " ")}</span><strong>${formatMetricValue(values[key])}</strong>`;
@@ -475,6 +474,7 @@ function renderRunDetails(payload) {
   const dataset = payload.dataset || {};
   const training = payload.training_config || {};
   const preprocessing = payload.preprocessing_config || {};
+  const environment = payload.environment || {};
   const targetKind = run.target_kind === "binary_numeric_label" ? "Binary 0/1 label" : "Numeric regression target";
   const cleanup = run.source_dataset_removed_after_run || payload.dataset_removed ? "Uploaded source file deleted after run" : "Uploaded source file retained";
   const preprocessingText =
@@ -486,6 +486,8 @@ function renderRunDetails(payload) {
   renderMeta(document.querySelector("#run-details"), {
     run_id: run.run_id || currentRunId || "none",
     created_at: run.created_at ? new Date(run.created_at).toLocaleString() : "unknown",
+    completed_at: run.completed_at ? new Date(run.completed_at).toLocaleString() : "unknown",
+    elapsed_seconds: run.elapsed_seconds ?? "-",
     dataset: dataset.original_name || run.dataset_id || "unknown",
     sequence_column: training.sequence_col || "unknown",
     target_column: training.target_col || "unknown",
@@ -502,8 +504,50 @@ function renderRunDetails(payload) {
     cv_folds: training.cv_folds ?? "-",
     training_cycles: training.training_cycles ?? "-",
     early_stopping_patience: training.early_stopping_patience ?? "-",
+    python_version: environment.python_version || "-",
     preprocessing: preprocessingText,
     data_cleanup: cleanup,
+  });
+  renderExportSummary(payload, preprocessingText);
+}
+
+function selectedMetricNames(metrics) {
+  const names = new Set();
+  Object.values(metrics || {}).forEach((values) => {
+    Object.keys(values || {}).forEach((key) => {
+      if (key !== "task_type") names.add(key);
+    });
+  });
+  return [...names].sort();
+}
+
+function renderExportSummary(payload, preprocessingText) {
+  const run = payload.run || {};
+  const training = payload.training_config || {};
+  const metrics = payload.metrics || {};
+  const environment = payload.environment || {};
+  const packages = environment.packages || {};
+  const artifacts = run.artifact_paths ? Object.values(run.artifact_paths) : [
+    "metrics.json",
+    "predictions.csv",
+    "run_manifest.json",
+    "dataset_manifest.json",
+    "preprocessing_config.json",
+    "training_config.json",
+    "benchmark_plan.json",
+    "environment.json",
+  ];
+
+  renderMeta(document.querySelector("#export-summary"), {
+    selected_models: training.models || [],
+    selected_metrics: selectedMetricNames(metrics),
+    preprocessing: preprocessingText || "none",
+    split_and_seed: `${training.split_strategy || "-"}; seed ${training.random_seed ?? "-"}`,
+    threshold_policy: `${training.threshold_strategy || "-"}; ${training.threshold_scope || "-"}`,
+    rows_and_timing: `${training.rows_used ?? run.rows_used ?? "-"} rows; ${run.elapsed_seconds ?? "-"} seconds`,
+    python_version: environment.python_version || "-",
+    package_versions: Object.entries(packages).map(([name, version]) => `${name} ${version}`),
+    export_artifacts: artifacts,
   });
 }
 

@@ -406,6 +406,12 @@ body[data-mode="beginner"] .advanced-only {
   transform: translateY(-1px);
 }
 
+.upload-panel > button[type="submit"] {
+  width: 100%;
+  min-height: 44px;
+  font-weight: 800;
+}
+
 .drop-zone input {
   display: none;
 }
@@ -492,7 +498,7 @@ body[data-mode="beginner"] .advanced-only {
 
 .metric-pill-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
   gap: 8px;
 }
 
@@ -516,6 +522,7 @@ body[data-mode="beginner"] .advanced-only {
 .metric-pill strong {
   color: var(--ink);
   font-size: 18px;
+  word-break: break-word;
 }
 
 .analysis-card {

@@ -5,6 +5,8 @@ import os
 import re
 import smtplib
 import shutil
+import sys
+import time
 import uuid
 import zipfile
 from datetime import datetime, timezone
@@ -14,7 +16,9 @@ from typing import Any
 from urllib.parse import quote, urlparse
 
 import joblib
+import numpy as np
 import pandas as pd
+import sklearn
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -129,6 +133,20 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def runtime_environment() -> dict[str, Any]:
+    return {
+        "python_version": sys.version.split()[0],
+        "python_implementation": sys.implementation.name,
+        "packages": {
+            "fastapi": getattr(sys.modules.get("fastapi"), "__version__", "unknown"),
+            "joblib": getattr(joblib, "__version__", "unknown"),
+            "numpy": np.__version__,
+            "pandas": pd.__version__,
+            "scikit_learn": sklearn.__version__,
+        },
+    }
+
+
 def ensure_storage() -> None:
     DATASETS_ROOT.mkdir(parents=True, exist_ok=True)
     RUNS_ROOT.mkdir(parents=True, exist_ok=True)
@@ -230,6 +248,7 @@ def build_run_email_body(run_id: str, base_url: str) -> str:
     dataset_manifest = read_json(folder / "dataset_manifest.json")
     training_config = read_json(folder / "training_config.json")
     metrics = read_json(folder / "metrics.json")
+    environment = read_json(folder / "environment.json") if (folder / "environment.json").exists() else {}
     export_url = f"{base_url.rstrip('/')}/api/runs/{run_id}/export"
 
     lines = [
@@ -237,11 +256,14 @@ def build_run_email_body(run_id: str, base_url: str) -> str:
         "",
         f"Run ID: {run_id}",
         f"Created: {manifest.get('created_at', 'unknown')}",
+        f"Completed: {manifest.get('completed_at', 'unknown')}",
+        f"Elapsed seconds: {manifest.get('elapsed_seconds', 'unknown')}",
         f"Dataset: {dataset_manifest.get('original_name', dataset_manifest.get('dataset_id', 'unknown'))}",
         f"Dataset SHA256: {dataset_manifest.get('sha256', 'unknown')}",
         f"Sequence column: {training_config.get('sequence_col', 'unknown')}",
         f"Target column: {training_config.get('target_col', 'unknown')}",
         f"Models: {', '.join(training_config.get('models', []))}",
+        f"Python: {environment.get('python_version', 'unknown')}",
         "",
         "Metrics:",
     ]
@@ -577,6 +599,8 @@ def generate_benchmark_plan(request: BenchmarkPlanRequest) -> dict[str, Any]:
 
 @app.post("/api/benchmarks")
 def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
+    started_monotonic = time.perf_counter()
+    started_at = utc_now()
     df, dataset_manifest = load_dataset(request.dataset_id)
     if request.sequence_col not in df.columns:
         raise HTTPException(status_code=400, detail=f"Column not found: {request.sequence_col}")
@@ -704,6 +728,8 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "training_cycles": request.training_cycles,
         "early_stopping_patience": request.early_stopping_patience,
     }
+    elapsed_seconds = round(time.perf_counter() - started_monotonic, 4)
+    environment = runtime_environment()
     request_for_plan = (
         request.model_copy(update={"preprocessing": preprocessing_config})
         if hasattr(request, "model_copy")
@@ -712,7 +738,9 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     benchmark_plan = make_benchmark_plan(request_for_plan, dataset_manifest)
     run_manifest = {
         "run_id": run_id,
-        "created_at": utc_now(),
+        "created_at": started_at,
+        "completed_at": utc_now(),
+        "elapsed_seconds": elapsed_seconds,
         "dataset_id": request.dataset_id,
         "dataset_sha256": dataset_manifest["sha256"],
         "seqtrainer_benchlab_version": "0.1.0",
@@ -729,6 +757,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
             "preprocessing_config": "preprocessing_config.json",
             "training_config": "training_config.json",
             "benchmark_plan": "benchmark_plan.json",
+            "environment": "environment.json",
         },
     }
 
@@ -737,6 +766,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     write_json(folder / "preprocessing_config.json", preprocessing_config)
     write_json(folder / "training_config.json", training_config)
     write_json(folder / "benchmark_plan.json", benchmark_plan)
+    write_json(folder / "environment.json", environment)
     write_json(folder / "run_manifest.json", run_manifest)
 
     dataset_removed = False
@@ -753,6 +783,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "dataset": dataset_manifest,
         "training_config": training_config,
         "preprocessing_config": preprocessing_config,
+        "environment": environment,
         "benchmark_plan": benchmark_plan,
         "codex_prompt": make_codex_prompt(benchmark_plan),
         "dataset_removed": dataset_removed,
@@ -784,6 +815,7 @@ def get_run(run_id: str) -> dict[str, Any]:
         "training_config": read_json(folder / "training_config.json"),
         "preprocessing_config": read_json(folder / "preprocessing_config.json"),
         "benchmark_plan": read_json(folder / "benchmark_plan.json") if (folder / "benchmark_plan.json").exists() else {},
+        "environment": read_json(folder / "environment.json") if (folder / "environment.json").exists() else {},
         "predictions": predictions.head(100).round(6).to_dict(orient="records"),
     }
 
@@ -832,6 +864,7 @@ def export_run(run_id: str) -> FileResponse:
             "preprocessing_config.json",
             "training_config.json",
             "benchmark_plan.json",
+            "environment.json",
         ]:
             artifact_path = folder / artifact
             if artifact_path.exists():
