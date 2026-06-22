@@ -32,6 +32,7 @@ uploaded biological datasets.
   - MCC
   - Confusion counts
 - Export:
+  - canonical `run_config.json`
   - metrics
   - predictions
   - run manifest
@@ -39,6 +40,7 @@ uploaded biological datasets.
   - preprocessing config
   - training config
   - benchmark plan JSON
+  - dependency lockfile, JSON schema, Dockerfile.repro, and environment.yml
 
 ## Benchmark Planning
 
@@ -192,6 +194,7 @@ SBOL/XML files are parsed for the first `sbol:elements` sequence and available n
 
 Every local run writes artifacts to `storage/runs/<run_id>` when storage is persistent:
 
+- `run_config.json`
 - `metrics.json`
 - `predictions.csv`
 - `run_manifest.json`
@@ -199,6 +202,11 @@ Every local run writes artifacts to `storage/runs/<run_id>` when storage is pers
 - `preprocessing_config.json`
 - `training_config.json`
 - `benchmark_plan.json`
+- `environment.json`
+- `requirements.lock.txt`
+- `run_config.schema.json`
+- `Dockerfile.repro`
+- `environment.yml`
 
 Uploaded source datasets are deleted automatically after a successful benchmark run by default.
 The run keeps the dataset manifest, metrics, predictions, and configs, but not the uploaded
@@ -219,6 +227,36 @@ storage/runs
 
 The current repository has been scrubbed of previous local run artifacts and uploaded
 datasets.
+
+## Replaying From JSON
+
+Every benchmark run now writes a canonical `run_config.json`. It combines UI/API inputs,
+dataset checksum, model choices, preprocessing, split settings, threshold policy, dependency
+snapshot, safe environment variables, git metadata, timestamp, and CPU/GPU/CUDA information.
+
+Validate and dry-run a saved config:
+
+```powershell
+python -m app.reproducibility.run_from_config --config path\to\run_config.json --dry-run
+```
+
+Export the JSON Schema:
+
+```powershell
+python -m app.reproducibility.export_schema --output schemas\run_config.schema.json
+```
+
+Example config:
+
+```text
+examples/reproducibility/run_config.example.json
+```
+
+More detail:
+
+```text
+docs/reproducible_runs.md
+```
 
 ## Email Results
 

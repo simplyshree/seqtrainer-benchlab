@@ -1,0 +1,128 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from .config import (
+    DatasetSpec,
+    DependencySpec,
+    HardwareSpec,
+    MetadataSpec,
+    ModelSpec,
+    PreprocessingSpec,
+    ReproducibleRunConfig,
+    SplitSpec,
+    TrainingSpec,
+)
+from .env import (
+    get_git_branch,
+    get_git_commit,
+    get_hardware_info,
+    get_pip_freeze,
+    get_relevant_env_vars,
+    get_repo_url,
+)
+
+
+def build_run_config(
+    *,
+    request: Any,
+    dataset_manifest: dict[str, Any],
+    preprocessing_config: dict[str, Any],
+    training_config: dict[str, Any],
+    environment: dict[str, Any],
+    run_manifest: dict[str, Any],
+    repo_root: Path,
+    dataset_path: str | None = None,
+) -> ReproducibleRunConfig:
+    packages = environment.get("pip_packages") or get_pip_freeze()
+    hardware_info = environment.get("hardware") or get_hardware_info()
+
+    models = [
+        ModelSpec(model_name=model_name, runner="benchlab_sklearn_baseline")
+        for model_name in training_config.get("models", [])
+    ]
+    models.extend(
+        ModelSpec(model_name=model_name, runner="external_colab_hpc_target")
+        for model_name in training_config.get("comparison_models_for_colab_hpc", [])
+        if model_name not in {model.model_name for model in models}
+    )
+
+    preprocessing_known = {
+        "use_gc",
+        "use_kmers",
+        "normalize_kmers",
+        "use_one_hot",
+        "kmer_size",
+        "sequence_length",
+    }
+    preprocessing = PreprocessingSpec(
+        use_gc=bool(preprocessing_config.get("use_gc", True)),
+        use_kmers=bool(preprocessing_config.get("use_kmers", True)),
+        normalize_kmers=bool(preprocessing_config.get("normalize_kmers", True)),
+        use_one_hot=bool(preprocessing_config.get("use_one_hot", False)),
+        kmer_size=int(preprocessing_config.get("kmer_size", 6)),
+        sequence_length=int(preprocessing_config.get("sequence_length", 150)),
+        additional_options={key: value for key, value in preprocessing_config.items() if key not in preprocessing_known},
+    )
+
+    return ReproducibleRunConfig(
+        dataset=DatasetSpec(
+            path=dataset_path,
+            sha256=dataset_manifest["sha256"],
+            size_bytes=dataset_manifest.get("upload_bytes"),
+            sequence_column=training_config.get("sequence_col") or getattr(request, "sequence_col", "sequence"),
+            target_column=training_config.get("target_col") or getattr(request, "target_col", "target"),
+            dataset_id=dataset_manifest.get("dataset_id"),
+            original_name=dataset_manifest.get("original_name"),
+            row_count=dataset_manifest.get("row_count"),
+            source_format=dataset_manifest.get("source_format"),
+        ),
+        split=SplitSpec(
+            split_strategy=training_config.get("split_strategy", getattr(request, "split_strategy", "fixed_train_validation_test")),
+            test_size=float(training_config.get("test_size", getattr(request, "test_size", 0.2))),
+            validation_size=float(training_config.get("validation_size", getattr(request, "validation_size", 0.1))),
+            random_seed=int(training_config.get("random_seed", getattr(request, "random_seed", 42))),
+            train_rows=training_config.get("train_rows"),
+            test_rows=training_config.get("test_rows"),
+            cv_folds=training_config.get("cv_folds"),
+            reruns=training_config.get("reruns"),
+        ),
+        preprocessing=preprocessing,
+        models=models or [ModelSpec(model_name="linear_regression", runner="benchlab_sklearn_baseline")],
+        training=TrainingSpec(
+            cycles=training_config.get("training_cycles"),
+            early_stopping_patience=training_config.get("early_stopping_patience"),
+            balance_strategy=training_config.get("class_balance_strategy", "none"),
+            threshold_strategy=training_config.get("threshold_strategy", "user_or_literature"),
+            threshold_value=training_config.get("classification_threshold"),
+            threshold_scope=training_config.get("threshold_scope", "shared"),
+            biological_goal=training_config.get("biological_goal"),
+            local_row_limit=training_config.get("local_row_limit"),
+            row_cap_applied=bool(training_config.get("row_cap_applied", False)),
+        ),
+        dependencies=DependencySpec(
+            python_version=environment.get("python_version", "unknown"),
+            pip_packages=packages,
+            cuda_version=hardware_info.get("cuda_version"),
+        ),
+        hardware=HardwareSpec(
+            device=hardware_info.get("device", "cpu"),
+            gpu_available=bool(hardware_info.get("gpu_available", False)),
+            cuda_available=bool(hardware_info.get("cuda_available", False)),
+            cuda_version=hardware_info.get("cuda_version"),
+            gpu_name=hardware_info.get("gpu_name"),
+        ),
+        env_vars=environment.get("env_vars") or get_relevant_env_vars(),
+        metadata=MetadataSpec(
+            created_at=run_manifest.get("created_at"),
+            completed_at=run_manifest.get("completed_at"),
+            elapsed_seconds=run_manifest.get("elapsed_seconds"),
+            git_commit=environment.get("git_commit") or get_git_commit(repo_root),
+            branch=environment.get("branch") or get_git_branch(repo_root),
+            repo_url=environment.get("repo_url") or get_repo_url(repo_root),
+            tool_version=run_manifest.get("seqtrainer_benchlab_version"),
+            run_id=run_manifest.get("run_id"),
+        ),
+    )
+

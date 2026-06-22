@@ -39,6 +39,19 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 
 from .seqtrainer_core import build_features, file_sha256, read_dataset
+from .reproducibility.builders import build_run_config
+from .reproducibility.config import json_schema
+from .reproducibility.env import (
+    get_git_branch,
+    get_git_commit,
+    get_hardware_info,
+    get_pip_freeze,
+    get_relevant_env_vars,
+    get_repo_url,
+    write_dockerfile_repro,
+    write_environment_yml,
+    write_requirements_lock,
+)
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -134,15 +147,23 @@ def utc_now() -> str:
 
 
 def runtime_environment() -> dict[str, Any]:
+    hardware = get_hardware_info()
     return {
         "python_version": sys.version.split()[0],
         "python_implementation": sys.implementation.name,
+        "pip_packages": get_pip_freeze(),
+        "git_commit": get_git_commit(REPO_ROOT),
+        "branch": get_git_branch(REPO_ROOT),
+        "repo_url": get_repo_url(REPO_ROOT),
+        "hardware": hardware,
+        "env_vars": get_relevant_env_vars(),
         "packages": {
             "fastapi": getattr(sys.modules.get("fastapi"), "__version__", "unknown"),
             "joblib": getattr(joblib, "__version__", "unknown"),
             "numpy": np.__version__,
             "pandas": pd.__version__,
             "scikit_learn": sklearn.__version__,
+            "cuda": hardware.get("cuda_version"),
         },
     }
 
@@ -751,6 +772,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "test_rows": test_rows,
         "target_kind": "binary_numeric_label" if binary_target else "numeric_regression",
         "artifact_paths": {
+            "run_config": "run_config.json",
             "metrics": "metrics.json",
             "predictions": "predictions.csv",
             "dataset_manifest": "dataset_manifest.json",
@@ -758,15 +780,34 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
             "training_config": "training_config.json",
             "benchmark_plan": "benchmark_plan.json",
             "environment": "environment.json",
+            "requirements_lock": "requirements.lock.txt",
+            "json_schema": "run_config.schema.json",
+            "dockerfile_repro": "Dockerfile.repro",
+            "environment_yml": "environment.yml",
         },
     }
+    run_config = build_run_config(
+        request=request_for_plan,
+        dataset_manifest=dataset_manifest,
+        preprocessing_config=preprocessing_config,
+        training_config=training_config,
+        environment=environment,
+        run_manifest=run_manifest,
+        repo_root=REPO_ROOT,
+        dataset_path=None if DELETE_DATASETS_AFTER_RUN else str(dataset_dir(request.dataset_id) / "dataset.csv"),
+    )
 
+    run_config.write_json(folder / "run_config.json")
     write_json(folder / "metrics.json", metrics)
     write_json(folder / "dataset_manifest.json", dataset_manifest)
     write_json(folder / "preprocessing_config.json", preprocessing_config)
     write_json(folder / "training_config.json", training_config)
     write_json(folder / "benchmark_plan.json", benchmark_plan)
     write_json(folder / "environment.json", environment)
+    write_json(folder / "run_config.schema.json", json_schema())
+    write_requirements_lock(run_config.dependencies.pip_packages, folder)
+    write_environment_yml(run_config.dependencies.python_version, run_config.dependencies.pip_packages, folder)
+    write_dockerfile_repro(run_config.dependencies.python_version, folder)
     write_json(folder / "run_manifest.json", run_manifest)
 
     dataset_removed = False
@@ -784,6 +825,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "training_config": training_config,
         "preprocessing_config": preprocessing_config,
         "environment": environment,
+        "run_config": run_config.to_dict(),
         "benchmark_plan": benchmark_plan,
         "codex_prompt": make_codex_prompt(benchmark_plan),
         "dataset_removed": dataset_removed,
@@ -816,6 +858,7 @@ def get_run(run_id: str) -> dict[str, Any]:
         "preprocessing_config": read_json(folder / "preprocessing_config.json"),
         "benchmark_plan": read_json(folder / "benchmark_plan.json") if (folder / "benchmark_plan.json").exists() else {},
         "environment": read_json(folder / "environment.json") if (folder / "environment.json").exists() else {},
+        "run_config": read_json(folder / "run_config.json") if (folder / "run_config.json").exists() else {},
         "predictions": predictions.head(100).round(6).to_dict(orient="records"),
     }
 
@@ -857,6 +900,7 @@ def export_run(run_id: str) -> FileResponse:
     zip_path = folder / f"{run_id}.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for artifact in [
+            "run_config.json",
             "metrics.json",
             "predictions.csv",
             "run_manifest.json",
@@ -865,6 +909,10 @@ def export_run(run_id: str) -> FileResponse:
             "training_config.json",
             "benchmark_plan.json",
             "environment.json",
+            "requirements.lock.txt",
+            "run_config.schema.json",
+            "Dockerfile.repro",
+            "environment.yml",
         ]:
             artifact_path = folder / artifact
             if artifact_path.exists():

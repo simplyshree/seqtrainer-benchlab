@@ -1,0 +1,756 @@
+{
+  "$defs": {
+    "DatasetSpec": {
+      "properties": {
+        "dataset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Id"
+        },
+        "original_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Original Name"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "row_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Count"
+        },
+        "sequence_column": {
+          "title": "Sequence Column",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        },
+        "source_format": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Format"
+        },
+        "target_column": {
+          "title": "Target Column",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        }
+      },
+      "required": [
+        "sha256",
+        "sequence_column",
+        "target_column"
+      ],
+      "title": "DatasetSpec",
+      "type": "object"
+    },
+    "DependencySpec": {
+      "properties": {
+        "conda_dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conda Dependencies",
+          "type": "array"
+        },
+        "cuda_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cuda Version"
+        },
+        "cudnn_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cudnn Version"
+        },
+        "pip_packages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Pip Packages",
+          "type": "array"
+        },
+        "python_version": {
+          "title": "Python Version",
+          "type": "string"
+        },
+        "system_packages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "System Packages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "python_version"
+      ],
+      "title": "DependencySpec",
+      "type": "object"
+    },
+    "HardwareSpec": {
+      "properties": {
+        "cuda_available": {
+          "default": false,
+          "title": "Cuda Available",
+          "type": "boolean"
+        },
+        "cuda_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cuda Version"
+        },
+        "device": {
+          "default": "cpu",
+          "title": "Device",
+          "type": "string"
+        },
+        "gpu_available": {
+          "default": false,
+          "title": "Gpu Available",
+          "type": "boolean"
+        },
+        "gpu_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gpu Name"
+        }
+      },
+      "title": "HardwareSpec",
+      "type": "object"
+    },
+    "MetadataSpec": {
+      "properties": {
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "elapsed_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Seconds"
+        },
+        "git_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Git Commit"
+        },
+        "repo_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repo Url"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "tool_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Version"
+        }
+      },
+      "required": [
+        "created_at"
+      ],
+      "title": "MetadataSpec",
+      "type": "object"
+    },
+    "ModelSpec": {
+      "properties": {
+        "checkpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checkpoint"
+        },
+        "model_name": {
+          "title": "Model Name",
+          "type": "string"
+        },
+        "model_variant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Variant"
+        },
+        "runner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runner"
+        },
+        "tokenizer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tokenizer"
+        }
+      },
+      "required": [
+        "model_name"
+      ],
+      "title": "ModelSpec",
+      "type": "object"
+    },
+    "PreprocessingSpec": {
+      "properties": {
+        "additional_options": {
+          "additionalProperties": true,
+          "title": "Additional Options",
+          "type": "object"
+        },
+        "kmer_size": {
+          "default": 6,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Kmer Size",
+          "type": "integer"
+        },
+        "normalize_kmers": {
+          "default": true,
+          "title": "Normalize Kmers",
+          "type": "boolean"
+        },
+        "sequence_length": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 150,
+          "title": "Sequence Length"
+        },
+        "use_gc": {
+          "default": true,
+          "title": "Use Gc",
+          "type": "boolean"
+        },
+        "use_kmers": {
+          "default": true,
+          "title": "Use Kmers",
+          "type": "boolean"
+        },
+        "use_one_hot": {
+          "default": false,
+          "title": "Use One Hot",
+          "type": "boolean"
+        }
+      },
+      "title": "PreprocessingSpec",
+      "type": "object"
+    },
+    "SplitSpec": {
+      "properties": {
+        "cv_folds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cv Folds"
+        },
+        "random_seed": {
+          "title": "Random Seed",
+          "type": "integer"
+        },
+        "reruns": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reruns"
+        },
+        "split_strategy": {
+          "title": "Split Strategy",
+          "type": "string"
+        },
+        "test_csv": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Test Csv"
+        },
+        "test_rows": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Test Rows"
+        },
+        "test_size": {
+          "title": "Test Size",
+          "type": "number"
+        },
+        "train_csv": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Train Csv"
+        },
+        "train_rows": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Train Rows"
+        },
+        "validation_csv": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Csv"
+        },
+        "validation_size": {
+          "title": "Validation Size",
+          "type": "number"
+        }
+      },
+      "required": [
+        "split_strategy",
+        "test_size",
+        "validation_size",
+        "random_seed"
+      ],
+      "title": "SplitSpec",
+      "type": "object"
+    },
+    "TrainingSpec": {
+      "properties": {
+        "balance_strategy": {
+          "default": "none",
+          "title": "Balance Strategy",
+          "type": "string"
+        },
+        "batch_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Batch Size"
+        },
+        "biological_goal": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Biological Goal"
+        },
+        "class_weighting": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Class Weighting"
+        },
+        "cycles": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cycles"
+        },
+        "dropout": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dropout"
+        },
+        "early_stopping_patience": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Early Stopping Patience"
+        },
+        "epochs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Epochs"
+        },
+        "learning_rate": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Learning Rate"
+        },
+        "local_row_limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Row Limit"
+        },
+        "primary_metrics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Primary Metrics",
+          "type": "array"
+        },
+        "row_cap_applied": {
+          "default": false,
+          "title": "Row Cap Applied",
+          "type": "boolean"
+        },
+        "threshold_scope": {
+          "title": "Threshold Scope",
+          "type": "string"
+        },
+        "threshold_strategy": {
+          "title": "Threshold Strategy",
+          "type": "string"
+        },
+        "threshold_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold Value"
+        },
+        "weight_decay": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weight Decay"
+        }
+      },
+      "required": [
+        "threshold_strategy",
+        "threshold_scope"
+      ],
+      "title": "TrainingSpec",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "dataset": {
+      "$ref": "#/$defs/DatasetSpec"
+    },
+    "dependencies": {
+      "$ref": "#/$defs/DependencySpec"
+    },
+    "env_vars": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Env Vars",
+      "type": "object"
+    },
+    "hardware": {
+      "$ref": "#/$defs/HardwareSpec"
+    },
+    "metadata": {
+      "$ref": "#/$defs/MetadataSpec"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ModelSpec"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "preprocessing": {
+      "$ref": "#/$defs/PreprocessingSpec"
+    },
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "split": {
+      "$ref": "#/$defs/SplitSpec"
+    },
+    "training": {
+      "$ref": "#/$defs/TrainingSpec"
+    }
+  },
+  "required": [
+    "dataset",
+    "split",
+    "preprocessing",
+    "models",
+    "training",
+    "dependencies",
+    "hardware",
+    "metadata"
+  ],
+  "title": "ReproducibleRunConfig",
+  "type": "object"
+}
