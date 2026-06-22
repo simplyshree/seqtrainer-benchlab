@@ -15,11 +15,31 @@ from app.seqtrainer_core import file_sha256
 from .config import ReproducibleRunConfig
 from .env import write_dockerfile_repro, write_environment_yml, write_requirements_lock
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
-def verify_dataset_checksum(config: ReproducibleRunConfig) -> bool | None:
-    if not config.dataset.path:
+
+def resolve_dataset_path(dataset_path: str | None, config_path: str | Path | None = None) -> Path | None:
+    if not dataset_path:
         return None
-    dataset_path = Path(config.dataset.path)
+    path = Path(dataset_path)
+    if path.is_absolute():
+        return path
+
+    candidates = [Path.cwd() / path, REPO_ROOT / path]
+    if config_path:
+        config_dir = Path(config_path).resolve().parent
+        candidates.extend([config_dir / path, config_dir.parent / path, config_dir.parent.parent / path])
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return (REPO_ROOT / path).resolve()
+
+
+def verify_dataset_checksum(config: ReproducibleRunConfig, config_path: str | Path | None = None) -> bool | None:
+    dataset_path = resolve_dataset_path(config.dataset.path, config_path)
+    if not dataset_path:
+        return None
     if not dataset_path.exists():
         return None
     return file_sha256(dataset_path) == config.dataset.sha256
@@ -37,7 +57,10 @@ def replay_from_config(
     models: list[str] | None = None,
 ) -> dict:
     config = ReproducibleRunConfig.load(config_path)
-    checksum_ok = verify_dataset_checksum(config)
+    resolved_dataset_path = resolve_dataset_path(config.dataset.path, config_path)
+    if resolved_dataset_path is not None:
+        config.dataset.path = str(resolved_dataset_path)
+    checksum_ok = verify_dataset_checksum(config, config_path)
     if checksum_ok is False:
         raise ValueError("Dataset checksum mismatch.")
 

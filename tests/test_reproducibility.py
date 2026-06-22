@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
@@ -68,6 +69,14 @@ class ReproducibilityTests(unittest.TestCase):
             self.assertEqual(summary["runnable_models"], ["linear_regression"])
             self.assertTrue((Path(tmp) / "metrics.json").exists())
             self.assertTrue((Path(tmp) / "predictions.csv").exists())
+
+    def test_replay_resolves_dataset_when_started_from_notebooks_folder(self) -> None:
+        config = ReproducibleRunConfig.load(EASY_CONFIG)
+        with patch("pathlib.Path.cwd", return_value=REPO_ROOT / "notebooks"):
+            self.assertTrue(verify_dataset_checksum(config, EASY_CONFIG))
+            with tempfile.TemporaryDirectory() as tmp:
+                summary = replay_from_config(EASY_CONFIG, output_dir=tmp, dry_run=False, models=["linear_regression"])
+                self.assertEqual(summary["runnable_models"], ["linear_regression"])
 
     def test_benchmark_request_converts_to_run_config(self) -> None:
         request = BenchmarkRequest(dataset_id="00000000-0000-0000-0000-000000000000", target_col="label")
