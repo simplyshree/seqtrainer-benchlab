@@ -240,6 +240,18 @@ Validate and dry-run a saved config:
 python -m app.reproducibility.run_from_config --config path\to\run_config.json --dry-run
 ```
 
+Run the easy local models from JSON in one command:
+
+```powershell
+python -m app.reproducibility.run_from_config --config examples\reproducibility\easy_run_config.json --output-dir storage\easy_replay
+```
+
+Notebook-style step-by-step runner:
+
+```text
+notebooks/easy_model_replay_steps.py
+```
+
 Export the JSON Schema:
 
 ```powershell

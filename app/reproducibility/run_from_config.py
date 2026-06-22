@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
+from app.model_runners.sklearn_easy import run_easy_models
 from app.seqtrainer_core import file_sha256
 
 from .config import ReproducibleRunConfig
@@ -29,7 +30,12 @@ def set_random_seeds(seed: int) -> None:
     np.random.seed(seed)
 
 
-def replay_from_config(config_path: str | Path, output_dir: str | Path | None = None, dry_run: bool = False) -> dict:
+def replay_from_config(
+    config_path: str | Path,
+    output_dir: str | Path | None = None,
+    dry_run: bool = False,
+    models: list[str] | None = None,
+) -> dict:
     config = ReproducibleRunConfig.load(config_path)
     checksum_ok = verify_dataset_checksum(config)
     if checksum_ok is False:
@@ -52,13 +58,19 @@ def replay_from_config(config_path: str | Path, output_dir: str | Path | None = 
         "random_seed": config.split.random_seed,
         "preprocessing": config.preprocessing.model_dump(mode="json"),
     }
-    (output / "replay_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
 
     if not dry_run:
-        raise NotImplementedError(
-            "Full model replay is intentionally not wired in this MVP. Use --dry-run to validate the config "
-            "or connect this command to the SeqTrainer CNN/DNABERT2/iPro-MP runner adapters."
+        run_result = run_easy_models(config, output, requested_models=models)
+        summary.update(
+            {
+                "runnable_models": run_result["runnable_models"],
+                "skipped_models": run_result["skipped_models"],
+                "metrics_path": run_result["metrics_path"],
+                "predictions_path": run_result["predictions_path"],
+            }
         )
+
+    (output / "replay_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     return summary
 
 
@@ -67,10 +79,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", required=True, help="Path to run_config.json")
     parser.add_argument("--output-dir", help="Directory for replay artifacts")
     parser.add_argument("--dry-run", action="store_true", help="Validate config and write replay artifacts without training")
+    parser.add_argument(
+        "--models",
+        nargs="*",
+        help="Optional easy-model subset: linear_regression random_forest gradient_boosting",
+    )
     args = parser.parse_args(argv)
 
     try:
-        summary = replay_from_config(args.config, args.output_dir, dry_run=args.dry_run)
+        summary = replay_from_config(args.config, args.output_dir, dry_run=args.dry_run, models=args.models)
     except Exception as exc:
         print(f"Replay failed: {exc}", file=sys.stderr)
         return 1
@@ -80,4 +97,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

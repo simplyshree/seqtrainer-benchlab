@@ -16,6 +16,7 @@ from app.seqtrainer_core import file_sha256
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_CONFIG = REPO_ROOT / "examples" / "reproducibility" / "run_config.example.json"
+EASY_CONFIG = REPO_ROOT / "examples" / "reproducibility" / "easy_run_config.json"
 
 
 class ReproducibilityTests(unittest.TestCase):
@@ -59,6 +60,14 @@ class ReproducibilityTests(unittest.TestCase):
             self.assertTrue(summary["dry_run"])
             self.assertTrue((Path(tmp) / "run_config.json").exists())
             self.assertTrue((Path(tmp) / "requirements.lock.txt").exists())
+
+    def test_replay_command_runs_easy_models(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = replay_from_config(EASY_CONFIG, output_dir=tmp, dry_run=False, models=["linear_regression"])
+            self.assertFalse(summary["dry_run"])
+            self.assertEqual(summary["runnable_models"], ["linear_regression"])
+            self.assertTrue((Path(tmp) / "metrics.json").exists())
+            self.assertTrue((Path(tmp) / "predictions.csv").exists())
 
     def test_benchmark_request_converts_to_run_config(self) -> None:
         request = BenchmarkRequest(dataset_id="00000000-0000-0000-0000-000000000000", target_col="label")
@@ -106,4 +115,3 @@ class ReproducibilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

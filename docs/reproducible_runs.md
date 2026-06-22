@@ -52,8 +52,32 @@ python -m app.reproducibility.run_from_config --config path\to\run_config.json -
 Dry-run mode validates the JSON, verifies the dataset checksum if the dataset file exists,
 sets random seeds, and writes a replay artifact directory without running heavy training.
 
-Full training replay is intentionally a later adapter step. The command is structured so
-CNN, DNABERT2, and iPro-MP runners can be connected without duplicating training logic.
+Run the easy local models in one command:
+
+```powershell
+python -m app.reproducibility.run_from_config --config examples\reproducibility\easy_run_config.json --output-dir storage\easy_replay
+```
+
+This currently supports:
+
+- `linear_regression`
+- `random_forest`
+- `gradient_boosting`
+
+You can run a subset:
+
+```powershell
+python -m app.reproducibility.run_from_config --config examples\reproducibility\easy_run_config.json --models random_forest gradient_boosting
+```
+
+For step-by-step notebook-style usage, open:
+
+```text
+notebooks/easy_model_replay_steps.py
+```
+
+Full CNN, DNABERT2, and iPro-MP replay is intentionally a later adapter step. The command is
+structured so those runners can be connected without duplicating training logic.
 
 ## Export JSON Schema
 
@@ -78,4 +102,3 @@ The replay command writes:
 - The dataset must be available locally or downloadable for true replay.
 - Passwords, API keys, SMTP secrets, and private tokens are intentionally excluded.
 - Full CNN/DNABERT2/iPro-MP replay still needs runner adapters connected to this config.
-
