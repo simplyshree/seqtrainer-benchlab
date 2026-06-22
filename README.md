@@ -252,6 +252,12 @@ Notebook-style step-by-step runner:
 notebooks/easy_model_replay_steps.py
 ```
 
+Beginner Jupyter notebook:
+
+```text
+notebooks/easy_model_replay_beginner.ipynb
+```
+
 Export the JSON Schema:
 
 ```powershell

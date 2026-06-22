@@ -76,6 +76,12 @@ For step-by-step notebook-style usage, open:
 notebooks/easy_model_replay_steps.py
 ```
 
+For a beginner-friendly Jupyter notebook, open:
+
+```text
+notebooks/easy_model_replay_beginner.ipynb
+```
+
 Full CNN, DNABERT2, and iPro-MP replay is intentionally a later adapter step. The command is
 structured so those runners can be connected without duplicating training logic.
 
