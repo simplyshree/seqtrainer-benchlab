@@ -181,6 +181,7 @@ function updateDatasetState(dataset) {
   uploadAnalysis.innerHTML = analysisMarkup;
   guidance.textContent = `${classText}${largeText} Default protocol: shared user/literature threshold, false positives treated as costly, 3 reruns, fixed materialized split.`;
   document.querySelector("#continue-preprocess").disabled = false;
+  document.querySelector("#json-import-card")?.classList.remove("hidden");
   updateBenchmarkPreview();
 
   if (summary.imbalance_detected) {
@@ -350,7 +351,7 @@ document.querySelector("#continue-benchmark").addEventListener("click", () => {
 
 document.querySelector("#continue-results").addEventListener("click", () => {
   if (!currentRunId) {
-    showToast("Run a benchmark first.");
+    showToast("Run a benchmark or export a run config first.");
     return;
   }
   goToPanel("results");
@@ -407,14 +408,7 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      currentRunId = data.run.run_id;
-      renderMetrics(data.metrics);
-      renderRunDetails(data);
-      renderPreviewTable(document.querySelector("#predictions-table"), data.predictions);
-      setExportLink(currentRunId);
-      setText("#state-run", currentRunId.slice(0, 8));
-      document.querySelector("#continue-results").disabled = false;
-      await loadRuns();
+      await showRunResult(data);
       showToast(data.dataset_removed ? "Benchmark complete. Uploaded dataset was deleted after run." : "Benchmark complete.");
       goToPanel("results");
     } catch (error) {
@@ -422,6 +416,18 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
     }
   });
 });
+
+async function showRunResult(data) {
+  currentRunId = data.run.run_id;
+  currentPlan = data.benchmark_plan ? { plan: data.benchmark_plan, codex_prompt: data.codex_prompt || "" } : currentPlan;
+  renderMetrics(data.metrics || {});
+  renderRunDetails(data);
+  renderPreviewTable(document.querySelector("#predictions-table"), data.predictions || []);
+  setExportLink(currentRunId);
+  setText("#state-run", currentRunId.slice(0, 8));
+  document.querySelector("#continue-results").disabled = false;
+  await loadRuns();
+}
 
 function renderMetrics(metrics) {
   const rows = Object.entries(metrics).map(([model, values]) => ({ model, ...values }));
@@ -485,6 +491,7 @@ function renderRunDetails(payload) {
 
   renderMeta(document.querySelector("#run-details"), {
     run_id: run.run_id || currentRunId || "none",
+    run_mode: run.run_mode || "local_benchmark",
     created_at: run.created_at ? new Date(run.created_at).toLocaleString() : "unknown",
     completed_at: run.completed_at ? new Date(run.completed_at).toLocaleString() : "unknown",
     elapsed_seconds: run.elapsed_seconds ?? "-",
@@ -615,6 +622,39 @@ document.querySelector("#generate-plan").addEventListener("click", async () => {
   }
 });
 
+document.querySelector("#go-config-export").addEventListener("click", () => {
+  if (!currentDatasetId) {
+    showToast("Upload a dataset first.");
+    return;
+  }
+  updateBenchmarkPreview();
+  goToPanel("benchmark");
+  showToast("Review settings, then export the run config without training.");
+});
+
+document.querySelector("#export-run-config").addEventListener("click", async () => {
+  if (!currentDatasetId) {
+    showToast("Upload a dataset first.");
+    return;
+  }
+  const button = document.querySelector("#export-run-config");
+  await withLoading(button, async () => {
+    try {
+      const data = await api("/api/run-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(benchmarkPayload()),
+      });
+      await showRunResult(data);
+      renderPlanOutput(data.benchmark_plan, data.codex_prompt);
+      showToast(data.dataset_removed ? "Run config export ready. Uploaded dataset was deleted." : "Run config export ready.");
+      goToPanel("results");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+});
+
 document.querySelector("#download-plan").addEventListener("click", () => {
   if (!currentPlan) return;
   const blob = new Blob([JSON.stringify(currentPlan.plan, null, 2)], { type: "application/json" });
@@ -706,6 +746,11 @@ function applyImportedRunConfig(config) {
 document.querySelector("#config-json-file").addEventListener("change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
+  if (!currentDatasetId) {
+    showToast("Upload the matching dataset before importing JSON.");
+    event.target.value = "";
+    return;
+  }
   try {
     const imported = JSON.parse(await file.text());
     if (imported.schema_version && imported.dataset && imported.split && imported.preprocessing) {
@@ -718,6 +763,9 @@ document.querySelector("#config-json-file").addEventListener("change", async (ev
     const output = document.querySelector("#plan-output");
     output.value = JSON.stringify(imported, null, 2);
     output.classList.remove("hidden");
+    document.querySelector("#continue-preprocess").disabled = false;
+    updateBenchmarkPreview();
+    goToPanel("benchmark");
   } catch (error) {
     showToast(`Could not import JSON: ${error.message}`);
   }

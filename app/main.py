@@ -515,6 +515,51 @@ def run_reproducibility_status(folder: Path, manifest: dict[str, Any]) -> str:
     return "partial"
 
 
+def resolve_target_column(df: pd.DataFrame, requested_target_col: str) -> str:
+    if requested_target_col in df.columns:
+        return requested_target_col
+    inferred_target = infer_column(list(df.columns), TARGET_COLUMN_CANDIDATES)
+    if inferred_target:
+        return inferred_target
+    available = ", ".join(str(column) for column in df.columns)
+    raise HTTPException(status_code=400, detail=f"Target column not found: {requested_target_col}. Available columns: {available}")
+
+
+def run_artifact_paths(include_predictions: bool = True) -> dict[str, str]:
+    artifacts = {
+        "run_config": "run_config.json",
+        "metrics": "metrics.json",
+        "dataset_manifest": "dataset_manifest.json",
+        "preprocessing_config": "preprocessing_config.json",
+        "training_config": "training_config.json",
+        "benchmark_plan": "benchmark_plan.json",
+        "environment": "environment.json",
+        "requirements_lock": "requirements.lock.txt",
+        "json_schema": "run_config.schema.json",
+        "dockerfile_repro": "Dockerfile.repro",
+        "environment_yml": "environment.yml",
+    }
+    if include_predictions:
+        artifacts["predictions"] = "predictions.csv"
+    return artifacts
+
+
+def replay_artifact_list(folder: Path) -> list[str]:
+    return [
+        artifact
+        for artifact in ["run_config.json", "requirements.lock.txt", "Dockerfile.repro", "environment.yml", "run_config.schema.json"]
+        if (folder / artifact).exists()
+    ]
+
+
+def write_reproducibility_bundle(folder: Path, run_config: Any, run_id: str) -> None:
+    run_config.write_json(folder / "run_config.json")
+    write_json(folder / "run_config.schema.json", json_schema())
+    write_requirements_lock(run_config.dependencies.pip_packages, folder, run_id=run_id, python_version=run_config.dependencies.python_version)
+    write_environment_yml(run_config.dependencies.python_version, run_config.dependencies.pip_packages, folder)
+    write_dockerfile_repro(run_config.dependencies.python_version, folder)
+
+
 app = FastAPI(title="SeqTrainer BenchLab", version="0.1.0")
 
 
@@ -638,6 +683,123 @@ def generate_benchmark_plan(request: BenchmarkPlanRequest) -> dict[str, Any]:
     return {"plan": plan, "codex_prompt": make_codex_prompt(plan)}
 
 
+@app.post("/api/run-configs")
+def generate_run_config_export(request: BenchmarkPlanRequest) -> dict[str, Any]:
+    started_monotonic = time.perf_counter()
+    started_at = utc_now()
+    df, dataset_manifest = load_dataset(request.dataset_id)
+    if request.sequence_col not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Column not found: {request.sequence_col}")
+    target_col = resolve_target_column(df, request.target_col)
+
+    preprocessing_config = sanitize_preprocessing(request.preprocessing)
+    source_rows = int(len(df))
+    row_cap_applied = source_rows > request.max_rows
+    rows_used = min(source_rows, request.max_rows)
+    class_balance_applied = False
+    numeric_target = pd.to_numeric(df[target_col], errors="coerce")
+    binary_target = is_binary_numeric_target(numeric_target)
+
+    run_id = str(uuid.uuid4())
+    folder = run_dir(run_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    environment = runtime_environment()
+    request_for_plan = (
+        request.model_copy(update={"preprocessing": preprocessing_config, "target_col": target_col})
+        if hasattr(request, "model_copy")
+        else request.copy(update={"preprocessing": preprocessing_config, "target_col": target_col})
+    )
+    benchmark_plan = make_benchmark_plan(request_for_plan, dataset_manifest)
+    elapsed_seconds = round(time.perf_counter() - started_monotonic, 4)
+    run_manifest = {
+        "run_id": run_id,
+        "created_at": started_at,
+        "completed_at": utc_now(),
+        "elapsed_seconds": elapsed_seconds,
+        "dataset_id": request.dataset_id,
+        "dataset_sha256": dataset_manifest["sha256"],
+        "seqtrainer_benchlab_version": "0.1.0",
+        "run_mode": "plan_only",
+        "rows_used": rows_used,
+        "row_cap_applied": row_cap_applied,
+        "class_balance_applied": class_balance_applied,
+        "train_rows": None,
+        "test_rows": None,
+        "target_kind": "binary_numeric_label" if binary_target else "numeric_regression_or_unvalidated_label",
+        "source_dataset_removed_after_run": DELETE_DATASETS_AFTER_RUN,
+        "artifact_paths": run_artifact_paths(include_predictions=False),
+    }
+    training_config = {
+        "models": request.models or [],
+        "test_size": request.test_size,
+        "validation_size": request.validation_size,
+        "random_seed": request.random_seed,
+        "split_strategy": request.split_strategy,
+        "sequence_col": request.sequence_col,
+        "target_col": target_col,
+        "rows_uploaded": int(dataset_manifest.get("row_count", source_rows)),
+        "local_row_limit": request.max_rows,
+        "row_cap_applied": row_cap_applied,
+        "class_balance_strategy": request.balance_strategy,
+        "class_balance_applied": class_balance_applied,
+        "rows_used": rows_used,
+        "train_rows": None,
+        "test_rows": None,
+        "binary_target": binary_target,
+        "threshold_strategy": request.threshold_strategy,
+        "threshold_scope": request.threshold_scope,
+        "biological_goal": request.biological_goal,
+        "classification_threshold": request.threshold_value,
+        "comparison_models_for_colab_hpc": request.comparison_models,
+        "reruns": request.reruns,
+        "cv_folds": request.cv_folds,
+        "training_cycles": request.training_cycles,
+        "early_stopping_patience": request.early_stopping_patience,
+        "plan_only": True,
+    }
+    run_config = build_run_config(
+        request=request_for_plan,
+        dataset_manifest=dataset_manifest,
+        preprocessing_config=preprocessing_config,
+        training_config=training_config,
+        environment=environment,
+        run_manifest=run_manifest,
+        repo_root=REPO_ROOT,
+        dataset_path=None if DELETE_DATASETS_AFTER_RUN else str(dataset_dir(request.dataset_id) / "dataset.csv"),
+    )
+
+    write_reproducibility_bundle(folder, run_config, run_id)
+    write_json(folder / "metrics.json", {})
+    write_json(folder / "dataset_manifest.json", dataset_manifest)
+    write_json(folder / "preprocessing_config.json", preprocessing_config)
+    write_json(folder / "training_config.json", training_config)
+    write_json(folder / "benchmark_plan.json", benchmark_plan)
+    write_json(folder / "environment.json", environment)
+    write_json(folder / "run_manifest.json", run_manifest)
+
+    dataset_removed = False
+    if DELETE_DATASETS_AFTER_RUN:
+        shutil.rmtree(dataset_dir(request.dataset_id), ignore_errors=True)
+        dataset_removed = True
+
+    return {
+        "run": run_manifest,
+        "metrics": {},
+        "predictions": [],
+        "dataset": dataset_manifest,
+        "training_config": training_config,
+        "preprocessing_config": preprocessing_config,
+        "environment": environment,
+        "run_config": run_config.to_dict(),
+        "benchmark_plan": benchmark_plan,
+        "codex_prompt": make_codex_prompt(benchmark_plan),
+        "replay_artifacts": replay_artifact_list(folder),
+        "reproducibility_status": run_reproducibility_status(folder, run_manifest),
+        "dataset_removed": dataset_removed,
+        "plan_only": True,
+    }
+
+
 @app.post("/api/replay-config")
 def replay_config(payload: dict[str, Any]) -> dict[str, Any]:
     dry_run = bool(payload.get("dry_run", True))
@@ -660,14 +822,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     df, dataset_manifest = load_dataset(request.dataset_id)
     if request.sequence_col not in df.columns:
         raise HTTPException(status_code=400, detail=f"Column not found: {request.sequence_col}")
-    target_col = request.target_col
-    if target_col not in df.columns:
-        inferred_target = infer_column(list(df.columns), TARGET_COLUMN_CANDIDATES)
-        if inferred_target:
-            target_col = inferred_target
-        else:
-            available = ", ".join(str(column) for column in df.columns)
-            raise HTTPException(status_code=400, detail=f"Target column not found: {request.target_col}. Available columns: {available}")
+    target_col = resolve_target_column(df, request.target_col)
 
     selected_models = request.models or ["linear_regression"]
     unknown_models = [model for model in selected_models if model not in MODEL_MAP]
@@ -705,6 +860,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
 
     metrics: dict[str, Any] = {}
     prediction_frames = []
+    classification_threshold = None
 
     for model_name in selected_models:
         model_cls = MODEL_MAP[model_name]
@@ -730,6 +886,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
             threshold = request.threshold_value if request.threshold_value is not None else 0.5
             if request.threshold_strategy == "median":
                 threshold = float(pd.Series(predictions).median())
+            classification_threshold = threshold
             actual_classes = y_test.astype(int).to_numpy()
             predicted_classes = (predictions >= threshold).astype(int)
             tn, fp, fn, tp = confusion_matrix(actual_classes, predicted_classes, labels=[0, 1]).ravel()
@@ -777,7 +934,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "threshold_strategy": request.threshold_strategy,
         "threshold_scope": request.threshold_scope,
         "biological_goal": request.biological_goal,
-        "classification_threshold": threshold if binary_target else None,
+        "classification_threshold": classification_threshold,
         "comparison_models_for_colab_hpc": request.comparison_models,
         "reruns": request.reruns,
         "cv_folds": request.cv_folds,
@@ -806,20 +963,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "train_rows": train_rows,
         "test_rows": test_rows,
         "target_kind": "binary_numeric_label" if binary_target else "numeric_regression",
-        "artifact_paths": {
-            "run_config": "run_config.json",
-            "metrics": "metrics.json",
-            "predictions": "predictions.csv",
-            "dataset_manifest": "dataset_manifest.json",
-            "preprocessing_config": "preprocessing_config.json",
-            "training_config": "training_config.json",
-            "benchmark_plan": "benchmark_plan.json",
-            "environment": "environment.json",
-            "requirements_lock": "requirements.lock.txt",
-            "json_schema": "run_config.schema.json",
-            "dockerfile_repro": "Dockerfile.repro",
-            "environment_yml": "environment.yml",
-        },
+        "artifact_paths": run_artifact_paths(include_predictions=True),
     }
     run_config = build_run_config(
         request=request_for_plan,
@@ -832,17 +976,13 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         dataset_path=None if DELETE_DATASETS_AFTER_RUN else str(dataset_dir(request.dataset_id) / "dataset.csv"),
     )
 
-    run_config.write_json(folder / "run_config.json")
+    write_reproducibility_bundle(folder, run_config, run_id)
     write_json(folder / "metrics.json", metrics)
     write_json(folder / "dataset_manifest.json", dataset_manifest)
     write_json(folder / "preprocessing_config.json", preprocessing_config)
     write_json(folder / "training_config.json", training_config)
     write_json(folder / "benchmark_plan.json", benchmark_plan)
     write_json(folder / "environment.json", environment)
-    write_json(folder / "run_config.schema.json", json_schema())
-    write_requirements_lock(run_config.dependencies.pip_packages, folder, run_id=run_id, python_version=run_config.dependencies.python_version)
-    write_environment_yml(run_config.dependencies.python_version, run_config.dependencies.pip_packages, folder)
-    write_dockerfile_repro(run_config.dependencies.python_version, folder)
     write_json(folder / "run_manifest.json", run_manifest)
 
     dataset_removed = False
@@ -852,11 +992,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         run_manifest["source_dataset_removed_after_run"] = True
         write_json(folder / "run_manifest.json", run_manifest)
 
-    replay_artifacts = [
-        artifact
-        for artifact in ["run_config.json", "requirements.lock.txt", "Dockerfile.repro", "environment.yml", "run_config.schema.json"]
-        if (folder / artifact).exists()
-    ]
+    replay_artifacts = replay_artifact_list(folder)
     return {
         "run": run_manifest,
         "metrics": metrics,
@@ -892,12 +1028,8 @@ def get_run(run_id: str) -> dict[str, Any]:
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Run not found")
     manifest = read_json(manifest_path)
-    predictions = pd.read_csv(folder / "predictions.csv")
-    replay_artifacts = [
-        artifact
-        for artifact in ["run_config.json", "requirements.lock.txt", "Dockerfile.repro", "environment.yml", "run_config.schema.json"]
-        if (folder / artifact).exists()
-    ]
+    predictions = pd.read_csv(folder / "predictions.csv") if (folder / "predictions.csv").exists() else pd.DataFrame()
+    replay_artifacts = replay_artifact_list(folder)
     return {
         "run": manifest,
         "metrics": read_json(folder / "metrics.json"),

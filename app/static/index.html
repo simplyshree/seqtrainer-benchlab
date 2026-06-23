@@ -136,6 +136,12 @@
               <div><span>Columns</span><strong id="dataset-cols">-</strong></div>
               <div><span>Format</span><strong id="dataset-format">-</strong></div>
             </div>
+            <div id="json-import-card" class="callout hidden">
+              <strong>Already have a saved plan?</strong>
+              <p>After uploading the matching dataset, import a BenchLab JSON to fill preprocessing, split, threshold, and model settings.</p>
+              <label class="import-config">Import JSON <input id="config-json-file" type="file" accept=".json,application/json" /></label>
+              <button id="go-config-export" type="button" class="secondary">Go To Export Settings</button>
+            </div>
           </div>
         </div>
         <div class="surface">
@@ -245,6 +251,7 @@
           </div>
           <div class="action-row">
             <button type="submit">Run Small Local Benchmark</button>
+            <button id="export-run-config" type="button" class="secondary">Export Run Config Without Training</button>
             <button id="generate-plan" type="button" class="secondary advanced-only">Create Colab/HPC Plan</button>
           </div>
           <details class="advanced-box advanced-only">
@@ -318,7 +325,6 @@
           </details>
           <div class="planner-box advanced-only">
             <div class="planner-actions">
-              <label class="import-config">Import JSON <input id="config-json-file" type="file" accept=".json,application/json" /></label>
               <button id="download-plan" type="button" class="secondary" disabled>Download Benchmark Plan JSON</button>
               <button id="copy-prompt" type="button" class="secondary" disabled>Copy Prompt</button>
             </div>
