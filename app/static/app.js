@@ -181,7 +181,9 @@ function updateDatasetState(dataset) {
   uploadAnalysis.innerHTML = analysisMarkup;
   guidance.textContent = `${classText}${largeText} Default protocol: shared user/literature threshold, false positives treated as costly, 3 reruns, fixed materialized split.`;
   document.querySelector("#continue-preprocess").disabled = false;
-  document.querySelector("#json-import-card")?.classList.remove("hidden");
+  document.querySelector("#config-json-file").disabled = false;
+  document.querySelector("#go-config-export").disabled = false;
+  setText("#json-import-help", "Dataset is loaded. Import a saved BenchLab JSON now, or go directly to export settings.");
   updateBenchmarkPreview();
 
   if (summary.imbalance_detected) {

@@ -5,7 +5,7 @@
     "path": "examples/reproducibility/easy_promoters.csv",
     "row_count": 12,
     "sequence_column": "sequence",
-    "sha256": "d97bd690264a8564dc44fef5aeb1931d60a45202f67f8833bdd327f111c5e014",
+    "sha256": "4743c4c4d52c106b5415577a33950af1905de2e3ff4fa753ff10f6444025e810",
     "size_bytes": 123,
     "source_format": ".csv",
     "target_column": "label",

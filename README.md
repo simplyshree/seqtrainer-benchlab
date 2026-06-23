@@ -107,6 +107,8 @@ not yet packaged as stable API endpoints.
 
 ## Quick Start
 
+For a short guide you can send to collaborators, see [`docs/intro_manual.md`](docs/intro_manual.md).
+
 ```bash
 py -3.11 -m venv .venv
 .venv\Scripts\activate
