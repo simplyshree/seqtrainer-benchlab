@@ -39,13 +39,16 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 
 from .seqtrainer_core import build_features, file_sha256, read_dataset
+from .replay import dry_run_summary, validate_run_config
 from .reproducibility.builders import build_run_config
 from .reproducibility.config import json_schema
 from .reproducibility.env import (
     get_git_branch,
     get_git_commit,
     get_hardware_info,
+    get_installed_requirement_versions,
     get_pip_freeze,
+    get_requirement_pins,
     get_relevant_env_vars,
     get_repo_url,
     write_dockerfile_repro,
@@ -148,10 +151,11 @@ def utc_now() -> str:
 
 def runtime_environment() -> dict[str, Any]:
     hardware = get_hardware_info()
+    installed_requirement_versions = get_installed_requirement_versions(REPO_ROOT)
     return {
         "python_version": sys.version.split()[0],
         "python_implementation": sys.implementation.name,
-        "pip_packages": get_pip_freeze(),
+        "pip_packages": get_requirement_pins(REPO_ROOT),
         "git_commit": get_git_commit(REPO_ROOT),
         "branch": get_git_branch(REPO_ROOT),
         "repo_url": get_repo_url(REPO_ROOT),
@@ -164,7 +168,9 @@ def runtime_environment() -> dict[str, Any]:
             "pandas": pd.__version__,
             "scikit_learn": sklearn.__version__,
             "cuda": hardware.get("cuda_version"),
+            **installed_requirement_versions,
         },
+        "installed_requirement_versions": installed_requirement_versions,
     }
 
 
@@ -495,6 +501,20 @@ def maybe_balance_binary_rows(df: pd.DataFrame, target_col: str, strategy: str, 
     return balanced.drop(columns=["_bench_target"]).sample(frac=1, random_state=random_seed).reset_index(drop=True), True
 
 
+def run_reproducibility_status(folder: Path, manifest: dict[str, Any]) -> str:
+    if not (folder / "run_config.json").exists():
+        return "missing_config"
+    if manifest.get("source_dataset_removed_after_run"):
+        return "partial"
+    dataset_id = manifest.get("dataset_id")
+    dataset_sha = manifest.get("dataset_sha256")
+    if dataset_id and dataset_sha:
+        dataset_path = dataset_dir(dataset_id) / "dataset.csv"
+        if dataset_path.exists() and file_sha256(dataset_path) == dataset_sha:
+            return "complete"
+    return "partial"
+
+
 app = FastAPI(title="SeqTrainer BenchLab", version="0.1.0")
 
 
@@ -616,6 +636,21 @@ def generate_benchmark_plan(request: BenchmarkPlanRequest) -> dict[str, Any]:
     _, dataset_manifest = load_dataset(request.dataset_id)
     plan = make_benchmark_plan(request, dataset_manifest)
     return {"plan": plan, "codex_prompt": make_codex_prompt(plan)}
+
+
+@app.post("/api/replay-config")
+def replay_config(payload: dict[str, Any]) -> dict[str, Any]:
+    dry_run = bool(payload.get("dry_run", True))
+    config_payload = payload.get("config") if "config" in payload else payload
+    if not config_payload:
+        raise HTTPException(status_code=400, detail="Provide a run_config JSON object.")
+    try:
+        config = validate_run_config(config_payload)
+        if dry_run:
+            return dry_run_summary(config)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid run_config: {exc}") from exc
+    raise HTTPException(status_code=400, detail="Full replay from API is not enabled yet. Use dry_run=true or the local CLI.")
 
 
 @app.post("/api/benchmarks")
@@ -805,7 +840,7 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
     write_json(folder / "benchmark_plan.json", benchmark_plan)
     write_json(folder / "environment.json", environment)
     write_json(folder / "run_config.schema.json", json_schema())
-    write_requirements_lock(run_config.dependencies.pip_packages, folder)
+    write_requirements_lock(run_config.dependencies.pip_packages, folder, run_id=run_id, python_version=run_config.dependencies.python_version)
     write_environment_yml(run_config.dependencies.python_version, run_config.dependencies.pip_packages, folder)
     write_dockerfile_repro(run_config.dependencies.python_version, folder)
     write_json(folder / "run_manifest.json", run_manifest)
@@ -817,6 +852,11 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         run_manifest["source_dataset_removed_after_run"] = True
         write_json(folder / "run_manifest.json", run_manifest)
 
+    replay_artifacts = [
+        artifact
+        for artifact in ["run_config.json", "requirements.lock.txt", "Dockerfile.repro", "environment.yml", "run_config.schema.json"]
+        if (folder / artifact).exists()
+    ]
     return {
         "run": run_manifest,
         "metrics": metrics,
@@ -828,6 +868,8 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "run_config": run_config.to_dict(),
         "benchmark_plan": benchmark_plan,
         "codex_prompt": make_codex_prompt(benchmark_plan),
+        "replay_artifacts": replay_artifacts,
+        "reproducibility_status": run_reproducibility_status(folder, run_manifest),
         "dataset_removed": dataset_removed,
     }
 
@@ -849,9 +891,15 @@ def get_run(run_id: str) -> dict[str, Any]:
     manifest_path = folder / "run_manifest.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Run not found")
+    manifest = read_json(manifest_path)
     predictions = pd.read_csv(folder / "predictions.csv")
+    replay_artifacts = [
+        artifact
+        for artifact in ["run_config.json", "requirements.lock.txt", "Dockerfile.repro", "environment.yml", "run_config.schema.json"]
+        if (folder / artifact).exists()
+    ]
     return {
-        "run": read_json(manifest_path),
+        "run": manifest,
         "metrics": read_json(folder / "metrics.json"),
         "dataset": read_json(folder / "dataset_manifest.json"),
         "training_config": read_json(folder / "training_config.json"),
@@ -859,6 +907,8 @@ def get_run(run_id: str) -> dict[str, Any]:
         "benchmark_plan": read_json(folder / "benchmark_plan.json") if (folder / "benchmark_plan.json").exists() else {},
         "environment": read_json(folder / "environment.json") if (folder / "environment.json").exists() else {},
         "run_config": read_json(folder / "run_config.json") if (folder / "run_config.json").exists() else {},
+        "replay_artifacts": replay_artifacts,
+        "reproducibility_status": run_reproducibility_status(folder, manifest),
         "predictions": predictions.head(100).round(6).to_dict(orient="records"),
     }
 

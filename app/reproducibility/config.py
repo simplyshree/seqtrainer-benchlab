@@ -21,6 +21,9 @@ class DatasetSpec(BaseModel):
     original_name: str | None = None
     row_count: int | None = None
     source_format: str | None = None
+    columns: list[str] = Field(default_factory=list)
+    source_dataset_removed_after_run: bool = True
+    note: str | None = None
 
 
 class SplitSpec(BaseModel):
@@ -74,17 +77,51 @@ class TrainingSpec(BaseModel):
     row_cap_applied: bool = False
 
 
+class ThresholdSpec(BaseModel):
+    threshold_strategy: str
+    threshold_value: float | None = None
+    threshold_scope: str
+    biological_goal: str | None = None
+    resolved_classification_threshold: float | None = None
+
+
+class BalanceSpec(BaseModel):
+    balance_strategy: str = "none"
+    class_balance_applied: bool = False
+    row_cap_applied: bool = False
+    local_row_limit: int | None = None
+    rows_used: int | None = None
+
+
+class ModelSelectionSpec(BaseModel):
+    local_models: list[str] = Field(default_factory=list)
+    comparison_models: list[str] = Field(default_factory=list)
+    runnable_local_models: list[str] = Field(default_factory=list)
+    planned_hpc_models: list[str] = Field(default_factory=list)
+    model_requirements: dict[str, str] = Field(default_factory=dict)
+
+
 class DependencySpec(BaseModel):
     python_version: str
+    python_implementation: str | None = None
+    docker_base_image: str = "python:3.11-slim"
     pip_packages: list[str] = Field(default_factory=list)
     system_packages: list[str] = Field(default_factory=list)
     conda_dependencies: list[str] = Field(default_factory=list)
     cuda_version: str | None = None
     cudnn_version: str | None = None
+    requirements_file: str = "requirements.txt"
+    requirements_lock_file: str = "requirements.lock.txt"
+    package_manager: str = "pip"
+    notes: str | None = None
 
 
 class HardwareSpec(BaseModel):
     device: str = "cpu"
+    platform: str | None = None
+    machine: str | None = None
+    processor: str | None = None
+    cpu_count: int | None = None
     gpu_available: bool = False
     cuda_available: bool = False
     cuda_version: str | None = None
@@ -100,6 +137,21 @@ class MetadataSpec(BaseModel):
     run_id: str | None = None
     completed_at: str | None = None
     elapsed_seconds: float | None = None
+    repo: str | None = None
+    upstream_seqtrainer_source: dict[str, Any] = Field(default_factory=dict)
+    artifact_paths: dict[str, str] = Field(default_factory=dict)
+
+
+class EnvironmentSpec(BaseModel):
+    safe_env_vars: dict[str, str] = Field(default_factory=dict)
+    excluded_secret_patterns: list[str] = Field(default_factory=lambda: ["SECRET", "TOKEN", "PASSWORD", "KEY"])
+
+
+class ReplaySpec(BaseModel):
+    dry_run_command: str
+    local_replay_command: str
+    docker_build_command: str = "docker build -f Dockerfile.repro -t seqtrainer-benchlab-repro ."
+    limitations: list[str] = Field(default_factory=list)
 
 
 class ReproducibleRunConfig(BaseModel):
@@ -108,11 +160,16 @@ class ReproducibleRunConfig(BaseModel):
     split: SplitSpec
     preprocessing: PreprocessingSpec
     models: list[ModelSpec]
+    model_selection: ModelSelectionSpec | None = None
+    threshold: ThresholdSpec | None = None
+    balance: BalanceSpec | None = None
     training: TrainingSpec
     dependencies: DependencySpec
     hardware: HardwareSpec
+    environment: EnvironmentSpec | None = None
     env_vars: dict[str, str] = Field(default_factory=dict)
     metadata: MetadataSpec
+    replay: ReplaySpec | None = None
 
     @classmethod
     def load(cls, path: str | Path) -> "ReproducibleRunConfig":
@@ -127,4 +184,3 @@ class ReproducibleRunConfig(BaseModel):
 
 def json_schema() -> dict[str, Any]:
     return ReproducibleRunConfig.model_json_schema()
-

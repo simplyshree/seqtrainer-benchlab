@@ -240,6 +240,20 @@ Validate and dry-run a saved config:
 python -m app.reproducibility.run_from_config --config path\to\run_config.json --dry-run
 ```
 
+Compatibility command:
+
+```powershell
+python -m app.replay --config path\to\run_config.json --dry-run
+```
+
+Dry replay API:
+
+```text
+POST /api/replay-config
+```
+
+Send either a raw `run_config.json` object or `{ "dry_run": true, "config": { ... } }`.
+
 Run the easy local models from JSON in one command:
 
 ```powershell
@@ -267,6 +281,7 @@ python -m app.reproducibility.export_schema --output schemas\run_config.schema.j
 Example config:
 
 ```text
+examples/run_config.example.json
 examples/reproducibility/run_config.example.json
 ```
 
@@ -275,6 +290,13 @@ More detail:
 ```text
 docs/reproducible_runs.md
 ```
+
+Limitations:
+
+- Exact GPU driver reproduction is not guaranteed.
+- Raw datasets are not stored in JSON. If `DELETE_DATASETS_AFTER_RUN=true`, full replay is partial until the dataset is restored or re-uploaded.
+- Secrets such as SMTP credentials, API keys, tokens, and passwords are intentionally excluded.
+- CNN, DNABERT2, and iPro-MP remain planned comparison targets unless stable runners are connected.
 
 ## Email Results
 

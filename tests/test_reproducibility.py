@@ -8,9 +8,10 @@ from unittest.mock import patch
 from pydantic import ValidationError
 
 from app.main import BenchmarkRequest
+from app.replay import dry_run_summary, validate_run_config
 from app.reproducibility.builders import build_run_config
 from app.reproducibility.config import ReproducibleRunConfig
-from app.reproducibility.env import write_dockerfile_repro, write_requirements_lock
+from app.reproducibility.env import get_relevant_env_vars, write_dockerfile_repro, write_environment_yml, write_requirements_lock
 from app.reproducibility.run_from_config import replay_from_config, verify_dataset_checksum
 from app.seqtrainer_core import file_sha256
 
@@ -54,6 +55,21 @@ class ReproducibilityTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn("FROM python:3.11-slim", text)
             self.assertIn("pip install --no-cache-dir -r requirements.lock.txt", text)
+            self.assertNotIn("SMTP_PASSWORD", text)
+
+    def test_environment_yml_is_generated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_environment_yml("3.11.9", ["numpy==2.2.1"], Path(tmp))
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("name: seqtrainer-benchlab-repro", text)
+            self.assertIn("numpy==2.2.1", text)
+
+    def test_safe_env_vars_exclude_secrets(self) -> None:
+        with patch.dict("os.environ", {"SEQTRAINER_MAX_LOCAL_ROWS": "1000", "SMTP_PASSWORD": "secret", "API_TOKEN": "token"}, clear=False):
+            env = get_relevant_env_vars()
+            self.assertEqual(env.get("SEQTRAINER_MAX_LOCAL_ROWS"), "1000")
+            self.assertNotIn("SMTP_PASSWORD", env)
+            self.assertNotIn("API_TOKEN", env)
 
     def test_replay_command_dry_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -61,6 +77,12 @@ class ReproducibilityTests(unittest.TestCase):
             self.assertTrue(summary["dry_run"])
             self.assertTrue((Path(tmp) / "run_config.json").exists())
             self.assertTrue((Path(tmp) / "requirements.lock.txt").exists())
+
+    def test_new_run_config_validation_and_dry_summary(self) -> None:
+        config = validate_run_config(ReproducibleRunConfig.load(EASY_CONFIG).to_dict())
+        summary = dry_run_summary(config)
+        self.assertTrue(summary["valid"])
+        self.assertIn("linear_regression", summary["models"])
 
     def test_replay_command_runs_easy_models(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -523,11 +523,15 @@ function selectedMetricNames(metrics) {
 
 function renderExportSummary(payload, preprocessingText) {
   const run = payload.run || {};
+  const dataset = payload.dataset || {};
   const training = payload.training_config || {};
   const metrics = payload.metrics || {};
   const environment = payload.environment || {};
+  const runConfig = payload.run_config || {};
   const packages = environment.packages || {};
-  const artifacts = run.artifact_paths ? Object.values(run.artifact_paths) : [
+  const dependencies = runConfig.dependencies || {};
+  const artifacts = payload.replay_artifacts?.length ? payload.replay_artifacts : run.artifact_paths ? Object.values(run.artifact_paths) : [
+    "run_config.json",
     "metrics.json",
     "predictions.csv",
     "run_manifest.json",
@@ -546,6 +550,9 @@ function renderExportSummary(payload, preprocessingText) {
     threshold_policy: `${training.threshold_strategy || "-"}; ${training.threshold_scope || "-"}`,
     rows_and_timing: `${training.rows_used ?? run.rows_used ?? "-"} rows; ${run.elapsed_seconds ?? "-"} seconds`,
     python_version: environment.python_version || "-",
+    docker_base_image: dependencies.docker_base_image || "-",
+    dataset_sha256: dataset.sha256 || run.dataset_sha256 || "-",
+    reproducibility_status: payload.reproducibility_status || "-",
     package_versions: Object.entries(packages).map(([name, version]) => `${name} ${version}`),
     export_artifacts: artifacts,
   });
@@ -653,16 +660,64 @@ function applyImportedConfig(plan) {
   updateBenchmarkPreview();
 }
 
+function applyImportedRunConfig(config) {
+  const dataset = config.dataset || {};
+  const split = config.split || {};
+  const preprocessing = config.preprocessing || {};
+  const threshold = config.threshold || config.training || {};
+  const balance = config.balance || config.training || {};
+  const training = config.training || {};
+  const modelSelection = config.model_selection || {};
+
+  setIfPresent("#sequence-col", dataset.sequence_column);
+  setIfPresent("#target-col", dataset.target_column);
+  setIfPresent("#split-strategy", split.split_strategy);
+  setIfPresent("#test-size", split.test_size);
+  setIfPresent("#validation-size", split.validation_size);
+  setIfPresent("#random-seed", split.random_seed);
+  setIfPresent("#cv-folds", split.cv_folds);
+  setIfPresent("#reruns", split.reruns);
+  setIfPresent("#threshold-strategy", threshold.threshold_strategy);
+  if (typeof threshold.threshold_value === "number") setIfPresent("#threshold-value", threshold.threshold_value);
+  setIfPresent("#threshold-scope", threshold.threshold_scope);
+  setIfPresent("#biological-goal", threshold.biological_goal);
+  setIfPresent("#balance-strategy", balance.balance_strategy);
+  setIfPresent("#max-rows", balance.local_row_limit || training.local_row_limit);
+  setIfPresent("#training-cycles", training.cycles || training.training_cycles);
+  setIfPresent("#early-stopping-patience", training.early_stopping_patience);
+  setIfPresent("#kmer-size", preprocessing.kmer_size);
+  setIfPresent("#sequence-length", preprocessing.sequence_length);
+  document.querySelector("#use-gc").checked = preprocessing.use_gc ?? true;
+  document.querySelector("#use-kmers").checked = preprocessing.use_kmers ?? true;
+  document.querySelector("#normalize-kmers").checked = preprocessing.normalize_kmers ?? true;
+  document.querySelector("#use-one-hot").checked = preprocessing.use_one_hot ?? false;
+
+  const localModels = modelSelection.local_models || (config.models || []).map((model) => model.model_name);
+  document.querySelectorAll(".model-option").forEach((node) => {
+    node.checked = localModels.includes(node.value);
+  });
+  const comparisonModels = modelSelection.comparison_models || [];
+  document.querySelectorAll(".comparison-model-option").forEach((node) => {
+    node.checked = comparisonModels.includes(node.value);
+  });
+  updateBenchmarkPreview();
+}
+
 document.querySelector("#config-json-file").addEventListener("change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
   try {
     const imported = JSON.parse(await file.text());
-    applyImportedConfig(imported);
+    if (imported.schema_version && imported.dataset && imported.split && imported.preprocessing) {
+      applyImportedRunConfig(imported);
+      showToast("Run config JSON imported.");
+    } else {
+      applyImportedConfig(imported);
+      showToast("Benchmark plan JSON imported.");
+    }
     const output = document.querySelector("#plan-output");
     output.value = JSON.stringify(imported, null, 2);
     output.classList.remove("hidden");
-    showToast("Benchmark JSON imported.");
   } catch (error) {
     showToast(`Could not import JSON: ${error.message}`);
   }

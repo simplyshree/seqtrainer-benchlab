@@ -49,6 +49,27 @@ Dry-run validation:
 python -m app.reproducibility.run_from_config --config path\to\run_config.json --dry-run
 ```
 
+Compatibility command:
+
+```powershell
+python -m app.replay --config path\to\run_config.json --dry-run
+```
+
+Dry-run API:
+
+```text
+POST /api/replay-config
+```
+
+The API accepts either a raw `run_config.json` object or:
+
+```json
+{
+  "dry_run": true,
+  "config": {}
+}
+```
+
 Dry-run mode validates the JSON, verifies the dataset checksum if the dataset file exists,
 sets random seeds, and writes a replay artifact directory without running heavy training.
 
@@ -106,5 +127,6 @@ The replay command writes:
 - Exact GPU driver reproduction is not guaranteed.
 - Docker is more reproducible than a raw pip/venv setup.
 - The dataset must be available locally or downloadable for true replay.
+- If `DELETE_DATASETS_AFTER_RUN=true`, the exported config is complete but local replay is partial until the raw dataset is restored or re-uploaded.
 - Passwords, API keys, SMTP secrets, and private tokens are intentionally excluded.
 - Full CNN/DNABERT2/iPro-MP replay still needs runner adapters connected to this config.

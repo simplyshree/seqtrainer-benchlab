@@ -1,7 +1,59 @@
 {
   "$defs": {
+    "BalanceSpec": {
+      "properties": {
+        "balance_strategy": {
+          "default": "none",
+          "title": "Balance Strategy",
+          "type": "string"
+        },
+        "class_balance_applied": {
+          "default": false,
+          "title": "Class Balance Applied",
+          "type": "boolean"
+        },
+        "local_row_limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Row Limit"
+        },
+        "row_cap_applied": {
+          "default": false,
+          "title": "Row Cap Applied",
+          "type": "boolean"
+        },
+        "rows_used": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows Used"
+        }
+      },
+      "title": "BalanceSpec",
+      "type": "object"
+    },
     "DatasetSpec": {
       "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
         "dataset_id": {
           "anyOf": [
             {
@@ -13,6 +65,18 @@
           ],
           "default": null,
           "title": "Dataset Id"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
         },
         "original_name": {
           "anyOf": [
@@ -69,6 +133,11 @@
           ],
           "default": null,
           "title": "Size Bytes"
+        },
+        "source_dataset_removed_after_run": {
+          "default": true,
+          "title": "Source Dataset Removed After Run",
+          "type": "boolean"
         },
         "source_format": {
           "anyOf": [
@@ -140,6 +209,28 @@
           "default": null,
           "title": "Cudnn Version"
         },
+        "docker_base_image": {
+          "default": "python:3.11-slim",
+          "title": "Docker Base Image",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "package_manager": {
+          "default": "pip",
+          "title": "Package Manager",
+          "type": "string"
+        },
         "pip_packages": {
           "items": {
             "type": "string"
@@ -147,8 +238,30 @@
           "title": "Pip Packages",
           "type": "array"
         },
+        "python_implementation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Python Implementation"
+        },
         "python_version": {
           "title": "Python Version",
+          "type": "string"
+        },
+        "requirements_file": {
+          "default": "requirements.txt",
+          "title": "Requirements File",
+          "type": "string"
+        },
+        "requirements_lock_file": {
+          "default": "requirements.lock.txt",
+          "title": "Requirements Lock File",
           "type": "string"
         },
         "system_packages": {
@@ -165,8 +278,40 @@
       "title": "DependencySpec",
       "type": "object"
     },
+    "EnvironmentSpec": {
+      "properties": {
+        "excluded_secret_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Excluded Secret Patterns",
+          "type": "array"
+        },
+        "safe_env_vars": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Safe Env Vars",
+          "type": "object"
+        }
+      },
+      "title": "EnvironmentSpec",
+      "type": "object"
+    },
     "HardwareSpec": {
       "properties": {
+        "cpu_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cpu Count"
+        },
         "cuda_available": {
           "default": false,
           "title": "Cuda Available",
@@ -205,6 +350,42 @@
           ],
           "default": null,
           "title": "Gpu Name"
+        },
+        "machine": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Machine"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Platform"
+        },
+        "processor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Processor"
         }
       },
       "title": "HardwareSpec",
@@ -212,6 +393,13 @@
     },
     "MetadataSpec": {
       "properties": {
+        "artifact_paths": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Artifact Paths",
+          "type": "object"
+        },
         "branch": {
           "anyOf": [
             {
@@ -264,6 +452,18 @@
           "default": null,
           "title": "Git Commit"
         },
+        "repo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repo"
+        },
         "repo_url": {
           "anyOf": [
             {
@@ -299,12 +499,58 @@
           ],
           "default": null,
           "title": "Tool Version"
+        },
+        "upstream_seqtrainer_source": {
+          "additionalProperties": true,
+          "title": "Upstream Seqtrainer Source",
+          "type": "object"
         }
       },
       "required": [
         "created_at"
       ],
       "title": "MetadataSpec",
+      "type": "object"
+    },
+    "ModelSelectionSpec": {
+      "properties": {
+        "comparison_models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Comparison Models",
+          "type": "array"
+        },
+        "local_models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Local Models",
+          "type": "array"
+        },
+        "model_requirements": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Model Requirements",
+          "type": "object"
+        },
+        "planned_hpc_models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Planned Hpc Models",
+          "type": "array"
+        },
+        "runnable_local_models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Runnable Local Models",
+          "type": "array"
+        }
+      },
+      "title": "ModelSelectionSpec",
       "type": "object"
     },
     "ModelSpec": {
@@ -419,6 +665,36 @@
       "title": "PreprocessingSpec",
       "type": "object"
     },
+    "ReplaySpec": {
+      "properties": {
+        "docker_build_command": {
+          "default": "docker build -f Dockerfile.repro -t seqtrainer-benchlab-repro .",
+          "title": "Docker Build Command",
+          "type": "string"
+        },
+        "dry_run_command": {
+          "title": "Dry Run Command",
+          "type": "string"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "local_replay_command": {
+          "title": "Local Replay Command",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dry_run_command",
+        "local_replay_command"
+      ],
+      "title": "ReplaySpec",
+      "type": "object"
+    },
     "SplitSpec": {
       "properties": {
         "cv_folds": {
@@ -529,6 +805,60 @@
         "random_seed"
       ],
       "title": "SplitSpec",
+      "type": "object"
+    },
+    "ThresholdSpec": {
+      "properties": {
+        "biological_goal": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Biological Goal"
+        },
+        "resolved_classification_threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved Classification Threshold"
+        },
+        "threshold_scope": {
+          "title": "Threshold Scope",
+          "type": "string"
+        },
+        "threshold_strategy": {
+          "title": "Threshold Strategy",
+          "type": "string"
+        },
+        "threshold_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold Value"
+        }
+      },
+      "required": [
+        "threshold_strategy",
+        "threshold_scope"
+      ],
+      "title": "ThresholdSpec",
       "type": "object"
     },
     "TrainingSpec": {
@@ -700,6 +1030,17 @@
     }
   },
   "properties": {
+    "balance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BalanceSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "dataset": {
       "$ref": "#/$defs/DatasetSpec"
     },
@@ -713,11 +1054,33 @@
       "title": "Env Vars",
       "type": "object"
     },
+    "environment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EnvironmentSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "hardware": {
       "$ref": "#/$defs/HardwareSpec"
     },
     "metadata": {
       "$ref": "#/$defs/MetadataSpec"
+    },
+    "model_selection": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelSelectionSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "models": {
       "items": {
@@ -729,6 +1092,17 @@
     "preprocessing": {
       "$ref": "#/$defs/PreprocessingSpec"
     },
+    "replay": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReplaySpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "schema_version": {
       "default": "1.0.0",
       "title": "Schema Version",
@@ -736,6 +1110,17 @@
     },
     "split": {
       "$ref": "#/$defs/SplitSpec"
+    },
+    "threshold": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ThresholdSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "training": {
       "$ref": "#/$defs/TrainingSpec"

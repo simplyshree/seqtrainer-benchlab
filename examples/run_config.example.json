@@ -1,0 +1,137 @@
+{
+  "balance": null,
+  "dataset": {
+    "columns": [],
+    "dataset_id": "easy-example-dataset",
+    "note": null,
+    "original_name": "easy_promoters.csv",
+    "path": "examples/reproducibility/easy_promoters.csv",
+    "row_count": 12,
+    "sequence_column": "sequence",
+    "sha256": "d97bd690264a8564dc44fef5aeb1931d60a45202f67f8833bdd327f111c5e014",
+    "size_bytes": 123,
+    "source_dataset_removed_after_run": true,
+    "source_format": ".csv",
+    "target_column": "label",
+    "uri": null
+  },
+  "dependencies": {
+    "conda_dependencies": [],
+    "cuda_version": null,
+    "cudnn_version": null,
+    "docker_base_image": "python:3.11-slim",
+    "notes": null,
+    "package_manager": "pip",
+    "pip_packages": [
+      "fastapi==0.115.6",
+      "joblib==1.4.2",
+      "numpy==2.2.1",
+      "pandas==2.2.3",
+      "scikit-learn==1.6.0"
+    ],
+    "python_implementation": null,
+    "python_version": "3.11.0",
+    "requirements_file": "requirements.txt",
+    "requirements_lock_file": "requirements.lock.txt",
+    "system_packages": []
+  },
+  "env_vars": {},
+  "environment": null,
+  "hardware": {
+    "cpu_count": null,
+    "cuda_available": false,
+    "cuda_version": null,
+    "device": "cpu",
+    "gpu_available": false,
+    "gpu_name": null,
+    "machine": null,
+    "platform": null,
+    "processor": null
+  },
+  "metadata": {
+    "artifact_paths": {},
+    "branch": "dev",
+    "completed_at": null,
+    "created_at": "2026-06-22T00:00:00+00:00",
+    "elapsed_seconds": null,
+    "git_commit": null,
+    "repo": null,
+    "repo_url": "https://github.com/simplyshree/seqtrainer-benchlab.git",
+    "run_id": "easy-example-run",
+    "tool_version": "0.1.0",
+    "upstream_seqtrainer_source": {}
+  },
+  "model_selection": null,
+  "models": [
+    {
+      "checkpoint": null,
+      "model_name": "linear_regression",
+      "model_variant": null,
+      "runner": "benchlab_sklearn_baseline",
+      "tokenizer": null
+    },
+    {
+      "checkpoint": null,
+      "model_name": "random_forest",
+      "model_variant": null,
+      "runner": "benchlab_sklearn_baseline",
+      "tokenizer": null
+    },
+    {
+      "checkpoint": null,
+      "model_name": "gradient_boosting",
+      "model_variant": null,
+      "runner": "benchlab_sklearn_baseline",
+      "tokenizer": null
+    }
+  ],
+  "preprocessing": {
+    "additional_options": {},
+    "kmer_size": 6,
+    "normalize_kmers": true,
+    "sequence_length": 150,
+    "use_gc": true,
+    "use_kmers": true,
+    "use_one_hot": false
+  },
+  "replay": null,
+  "schema_version": "1.0.0",
+  "split": {
+    "cv_folds": 5,
+    "random_seed": 42,
+    "reruns": 3,
+    "split_strategy": "fixed_train_validation_test",
+    "test_csv": null,
+    "test_rows": 3,
+    "test_size": 0.25,
+    "train_csv": null,
+    "train_rows": 9,
+    "validation_csv": null,
+    "validation_size": 0.1
+  },
+  "threshold": null,
+  "training": {
+    "balance_strategy": "none",
+    "batch_size": null,
+    "biological_goal": "limit_false_positives",
+    "class_weighting": null,
+    "cycles": 20,
+    "dropout": null,
+    "early_stopping_patience": 5,
+    "epochs": null,
+    "learning_rate": null,
+    "local_row_limit": 1000,
+    "primary_metrics": [
+      "MCC",
+      "F1",
+      "precision",
+      "recall",
+      "accuracy"
+    ],
+    "row_cap_applied": false,
+    "threshold_scope": "shared",
+    "threshold_strategy": "user_or_literature",
+    "threshold_value": 0.5,
+    "weight_decay": null
+  }
+}
