@@ -2,6 +2,7 @@ let currentDatasetId = null;
 let currentRunId = null;
 let currentDataset = null;
 let currentPlan = null;
+let currentRunConfig = null;
 let currentMode = localStorage.getItem("seqtrainerBenchLabMode") || "beginner";
 
 const toast = document.querySelector("#toast");
@@ -228,8 +229,8 @@ function benchmarkPayload() {
   };
 }
 
-function renderPlanOutput(plan, prompt) {
-  currentPlan = { plan, codex_prompt: prompt };
+function renderPlanOutput(plan, prompt, runConfig = null) {
+  currentPlan = { plan, codex_prompt: prompt, run_config: runConfig || currentRunConfig };
   const output = document.querySelector("#plan-output");
   output.value = `${JSON.stringify(plan, null, 2)}\n\n--- CODEX PROMPT ---\n${prompt}`;
   output.classList.remove("hidden");
@@ -421,11 +422,15 @@ document.querySelector("#benchmark-form").addEventListener("submit", async (even
 
 async function showRunResult(data) {
   currentRunId = data.run.run_id;
-  currentPlan = data.benchmark_plan ? { plan: data.benchmark_plan, codex_prompt: data.codex_prompt || "" } : currentPlan;
+  currentRunConfig = data.run_config || null;
+  currentPlan = data.benchmark_plan
+    ? { plan: data.benchmark_plan, codex_prompt: data.codex_prompt || "", run_config: currentRunConfig }
+    : currentPlan;
   renderMetrics(data.metrics || {});
   renderRunDetails(data);
   renderPreviewTable(document.querySelector("#predictions-table"), data.predictions || []);
   setExportLink(currentRunId);
+  document.querySelector("#download-run-config").disabled = !currentRunConfig;
   setText("#state-run", currentRunId.slice(0, 8));
   document.querySelector("#continue-results").disabled = false;
   await loadRuns();
@@ -539,7 +544,11 @@ function renderExportSummary(payload, preprocessingText) {
   const runConfig = payload.run_config || {};
   const packages = environment.packages || {};
   const dependencies = runConfig.dependencies || {};
-  const artifacts = payload.replay_artifacts?.length ? payload.replay_artifacts : run.artifact_paths ? Object.values(run.artifact_paths) : [
+  const artifacts = [...new Set([
+    ...(run.artifact_paths ? Object.values(run.artifact_paths) : []),
+    ...(payload.replay_artifacts || []),
+  ])];
+  const displayedArtifacts = artifacts.length ? artifacts : [
     "run_config.json",
     "metrics.json",
     "predictions.csv",
@@ -558,12 +567,12 @@ function renderExportSummary(payload, preprocessingText) {
     split_and_seed: `${training.split_strategy || "-"}; seed ${training.random_seed ?? "-"}`,
     threshold_policy: `${training.threshold_strategy || "-"}; ${training.threshold_scope || "-"}`,
     rows_and_timing: `${training.rows_used ?? run.rows_used ?? "-"} rows; ${run.elapsed_seconds ?? "-"} seconds`,
-    python_version: environment.python_version || "-",
+    python_version: environment.python_version || dependencies.python_version || "-",
     docker_base_image: dependencies.docker_base_image || "-",
     dataset_sha256: dataset.sha256 || run.dataset_sha256 || "-",
     reproducibility_status: payload.reproducibility_status || "-",
     package_versions: Object.entries(packages).map(([name, version]) => `${name} ${version}`),
-    export_artifacts: artifacts,
+    export_artifacts: displayedArtifacts,
   });
 }
 
@@ -599,6 +608,8 @@ async function loadRun(runId) {
   renderRunDetails(data);
   renderPreviewTable(document.querySelector("#predictions-table"), data.predictions);
   setExportLink(runId);
+  currentRunConfig = data.run_config && Object.keys(data.run_config).length ? data.run_config : null;
+  document.querySelector("#download-run-config").disabled = !currentRunConfig;
   setText("#state-run", runId.slice(0, 8));
 }
 
@@ -648,7 +659,7 @@ document.querySelector("#export-run-config").addEventListener("click", async () 
         body: JSON.stringify(benchmarkPayload()),
       });
       await showRunResult(data);
-      renderPlanOutput(data.benchmark_plan, data.codex_prompt);
+      renderPlanOutput(data.benchmark_plan, data.codex_prompt, data.run_config);
       showToast(data.dataset_removed ? "Run config export ready. Uploaded dataset was deleted." : "Run config export ready.");
       goToPanel("results");
     } catch (error) {
@@ -663,6 +674,20 @@ document.querySelector("#download-plan").addEventListener("click", () => {
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "seqtrainer-benchmark-plan.json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+document.querySelector("#download-run-config").addEventListener("click", () => {
+  const runConfig = currentRunConfig || currentPlan?.run_config;
+  if (!runConfig) {
+    showToast("No Run Config JSON is available for this run.");
+    return;
+  }
+  const blob = new Blob([JSON.stringify(runConfig, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "run_config.json";
   link.click();
   URL.revokeObjectURL(link.href);
 });
@@ -757,7 +782,7 @@ document.querySelector("#config-json-file").addEventListener("change", async (ev
     const imported = JSON.parse(await file.text());
     if (imported.schema_version && imported.dataset && imported.split && imported.preprocessing) {
       applyImportedRunConfig(imported);
-      showToast("Run config JSON imported.");
+      showToast("Run Config JSON imported.");
     } else {
       applyImportedConfig(imported);
       showToast("Benchmark plan JSON imported.");

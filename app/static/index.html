@@ -109,9 +109,9 @@
           <span class="format-list">sequence + label</span>
         </div>
         <div id="json-import-card" class="callout">
-          <strong>Use a saved BenchLab JSON</strong>
-          <p id="json-import-help">First upload the matching dataset, then import run_config.json or benchmark_plan.json to fill preprocessing, split, threshold, and model settings.</p>
-          <label class="import-config">Import JSON <input id="config-json-file" type="file" accept=".json,application/json" disabled /></label>
+          <strong>Use a saved Run Config JSON</strong>
+          <p id="json-import-help">First upload the matching dataset, then import run_config.json or an older benchmark_plan.json to fill preprocessing, split, threshold, and model settings.</p>
+          <label class="import-config">Import Run Config JSON <input id="config-json-file" type="file" accept=".json,application/json" disabled /></label>
           <button id="go-config-export" type="button" class="secondary" disabled>Go To Export Settings</button>
         </div>
         <div class="grid two dataset-grid">
@@ -342,7 +342,10 @@
             <h2>Results</h2>
             <p>Compare key metrics first, then inspect run details, predictions, and export artifacts.</p>
           </div>
-          <a id="export-link" class="export hidden" href="#">Export Run Bundle</a>
+          <div class="heading-actions">
+            <button id="download-run-config" type="button" class="secondary" disabled>Download Run Config JSON</button>
+            <a id="export-link" class="export hidden" href="#">Export Run Bundle</a>
+          </div>
         </div>
         <div class="surface stack metrics-surface">
           <div class="table-heading">

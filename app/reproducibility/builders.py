@@ -27,6 +27,8 @@ from .env import (
     get_pip_freeze,
     get_relevant_env_vars,
     get_repo_url,
+    sanitize_env_vars,
+    sanitize_pip_packages,
 )
 
 
@@ -41,8 +43,9 @@ def build_run_config(
     repo_root: Path,
     dataset_path: str | None = None,
 ) -> ReproducibleRunConfig:
-    packages = environment.get("pip_packages") or get_pip_freeze()
+    packages = sanitize_pip_packages(environment.get("pip_packages") or get_pip_freeze())
     hardware_info = environment.get("hardware") or get_hardware_info()
+    safe_env_vars = sanitize_env_vars(environment.get("env_vars") or get_relevant_env_vars())
     local_models = list(training_config.get("models", []))
     comparison_models = list(training_config.get("comparison_models_for_colab_hpc", []))
     runnable_local = [model for model in local_models if model in {"linear_regression", "random_forest", "gradient_boosting"}]
@@ -89,6 +92,8 @@ def build_run_config(
             source_format=dataset_manifest.get("source_format"),
             columns=dataset_manifest.get("columns", []),
             source_dataset_removed_after_run=bool(run_manifest.get("source_dataset_removed_after_run", dataset_path is None)),
+            run_mode=run_manifest.get("run_mode", "local_benchmark"),
+            plan_only=bool(training_config.get("plan_only", False)),
             note="Raw dataset must be retained locally or re-uploaded to fully replay model training.",
         ),
         split=SplitSpec(
@@ -97,6 +102,7 @@ def build_run_config(
             validation_size=float(training_config.get("validation_size", getattr(request, "validation_size", 0.1))),
             random_seed=int(training_config.get("random_seed", getattr(request, "random_seed", 42))),
             train_rows=training_config.get("train_rows"),
+            validation_rows=training_config.get("validation_rows"),
             test_rows=training_config.get("test_rows"),
             cv_folds=training_config.get("cv_folds"),
             reruns=training_config.get("reruns"),
@@ -128,6 +134,8 @@ def build_run_config(
             balance_strategy=training_config.get("class_balance_strategy", "none"),
             class_balance_applied=bool(training_config.get("class_balance_applied", False)),
             row_cap_applied=bool(training_config.get("row_cap_applied", False)),
+            reruns=training_config.get("reruns"),
+            cv_folds=training_config.get("cv_folds"),
             local_row_limit=training_config.get("local_row_limit"),
             rows_used=training_config.get("rows_used"),
         ),
@@ -160,13 +168,16 @@ def build_run_config(
             cuda_available=bool(hardware_info.get("cuda_available", False)),
             cuda_version=hardware_info.get("cuda_version"),
             gpu_name=hardware_info.get("gpu_name"),
+            gpu_count=int(hardware_info.get("gpu_count", 0)),
+            gpu_names=list(hardware_info.get("gpu_names", [])),
         ),
-        environment=EnvironmentSpec(safe_env_vars=environment.get("env_vars") or get_relevant_env_vars()),
-        env_vars=environment.get("env_vars") or get_relevant_env_vars(),
+        environment=EnvironmentSpec(safe_env_vars=safe_env_vars),
+        env_vars=safe_env_vars,
         metadata=MetadataSpec(
             created_at=run_manifest.get("created_at"),
             completed_at=run_manifest.get("completed_at"),
             elapsed_seconds=run_manifest.get("elapsed_seconds"),
+            commit=environment.get("git_commit") or get_git_commit(repo_root),
             git_commit=environment.get("git_commit") or get_git_commit(repo_root),
             branch=environment.get("branch") or get_git_branch(repo_root),
             repo_url=environment.get("repo_url") or get_repo_url(repo_root),

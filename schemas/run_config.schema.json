@@ -102,6 +102,11 @@
           "default": null,
           "title": "Path"
         },
+        "plan_only": {
+          "default": false,
+          "title": "Plan Only",
+          "type": "boolean"
+        },
         "row_count": {
           "anyOf": [
             {
@@ -113,6 +118,18 @@
           ],
           "default": null,
           "title": "Row Count"
+        },
+        "run_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Mode"
         },
         "sequence_column": {
           "title": "Sequence Column",
@@ -339,6 +356,11 @@
           "title": "Gpu Available",
           "type": "boolean"
         },
+        "gpu_count": {
+          "default": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
         "gpu_name": {
           "anyOf": [
             {
@@ -350,6 +372,13 @@
           ],
           "default": null,
           "title": "Gpu Name"
+        },
+        "gpu_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Gpu Names",
+          "type": "array"
         },
         "machine": {
           "anyOf": [
@@ -411,6 +440,18 @@
           ],
           "default": null,
           "title": "Branch"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
         },
         "completed_at": {
           "anyOf": [
@@ -793,6 +834,18 @@
           "default": null,
           "title": "Validation Csv"
         },
+        "validation_rows": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Rows"
+        },
         "validation_size": {
           "title": "Validation Size",
           "type": "number"
@@ -904,6 +957,18 @@
           "default": null,
           "title": "Class Weighting"
         },
+        "cv_folds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cv Folds"
+        },
         "cycles": {
           "anyOf": [
             {
@@ -982,6 +1047,18 @@
           },
           "title": "Primary Metrics",
           "type": "array"
+        },
+        "reruns": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reruns"
         },
         "row_cap_applied": {
           "default": false,

@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from .env import sanitize_env_vars, sanitize_pip_packages
 
 
 SCHEMA_VERSION = "1.0.0"
@@ -23,6 +25,8 @@ class DatasetSpec(BaseModel):
     source_format: str | None = None
     columns: list[str] = Field(default_factory=list)
     source_dataset_removed_after_run: bool = True
+    run_mode: str | None = None
+    plan_only: bool = False
     note: str | None = None
 
 
@@ -35,6 +39,7 @@ class SplitSpec(BaseModel):
     test_csv: str | None = None
     random_seed: int
     train_rows: int | None = None
+    validation_rows: int | None = None
     test_rows: int | None = None
     cv_folds: int | None = None
     reruns: int | None = None
@@ -75,6 +80,8 @@ class TrainingSpec(BaseModel):
     biological_goal: str | None = None
     local_row_limit: int | None = None
     row_cap_applied: bool = False
+    reruns: int | None = None
+    cv_folds: int | None = None
 
 
 class ThresholdSpec(BaseModel):
@@ -115,6 +122,11 @@ class DependencySpec(BaseModel):
     package_manager: str = "pip"
     notes: str | None = None
 
+    @field_validator("pip_packages", mode="before")
+    @classmethod
+    def sanitize_packages(cls, value: Any) -> list[str]:
+        return sanitize_pip_packages(value or [])
+
 
 class HardwareSpec(BaseModel):
     device: str = "cpu"
@@ -126,10 +138,13 @@ class HardwareSpec(BaseModel):
     cuda_available: bool = False
     cuda_version: str | None = None
     gpu_name: str | None = None
+    gpu_count: int = 0
+    gpu_names: list[str] = Field(default_factory=list)
 
 
 class MetadataSpec(BaseModel):
     created_at: str
+    commit: str | None = None
     git_commit: str | None = None
     repo_url: str | None = None
     branch: str | None = None
@@ -145,6 +160,11 @@ class MetadataSpec(BaseModel):
 class EnvironmentSpec(BaseModel):
     safe_env_vars: dict[str, str] = Field(default_factory=dict)
     excluded_secret_patterns: list[str] = Field(default_factory=lambda: ["SECRET", "TOKEN", "PASSWORD", "KEY"])
+
+    @field_validator("safe_env_vars", mode="before")
+    @classmethod
+    def sanitize_environment(cls, value: Any) -> dict[str, str]:
+        return sanitize_env_vars(value or {})
 
 
 class ReplaySpec(BaseModel):
@@ -170,6 +190,11 @@ class ReproducibleRunConfig(BaseModel):
     env_vars: dict[str, str] = Field(default_factory=dict)
     metadata: MetadataSpec
     replay: ReplaySpec | None = None
+
+    @field_validator("env_vars", mode="before")
+    @classmethod
+    def sanitize_legacy_environment(cls, value: Any) -> dict[str, str]:
+        return sanitize_env_vars(value or {})
 
     @classmethod
     def load(cls, path: str | Path) -> "ReproducibleRunConfig":

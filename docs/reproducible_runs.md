@@ -40,6 +40,12 @@ Run BenchLab normally and start a benchmark. The run directory contains:
 - `environment.json`
 
 The export ZIP from the Results screen includes these same files.
+The Results screen also provides **Download Run Config JSON** for downloading only the
+canonical configuration without unpacking the ZIP.
+
+`requirements.lock.txt` is generated from the active Python environment using `pip freeze`
+when available. Credential-bearing URL components and environment variables that look like
+passwords, tokens, secrets, or keys are excluded from reproducibility artifacts.
 
 ## Replay From JSON
 
@@ -130,3 +136,24 @@ The replay command writes:
 - If `DELETE_DATASETS_AFTER_RUN=true`, the exported config is complete but local replay is partial until the raw dataset is restored or re-uploaded.
 - Passwords, API keys, SMTP secrets, and private tokens are intentionally excluded.
 - Full CNN/DNABERT2/iPro-MP replay still needs runner adapters connected to this config.
+
+## Docker Replay
+
+Build the generated replay image from an exported run directory:
+
+```powershell
+docker build -f Dockerfile.repro -t seqtrainer-benchlab-repro .
+docker run --rm seqtrainer-benchlab-repro
+```
+
+The generated Dockerfile uses `python:3.11-slim` and installs
+`requirements.lock.txt`. It validates the config in dry-run mode by default. Docker captures
+the Python dependency environment, but it cannot guarantee an identical host GPU driver,
+CUDA runtime, CPU instruction set, or external model checkpoint availability.
+
+## Implementation References
+
+- [Pydantic models and JSON Schema](https://docs.pydantic.dev/latest/concepts/models/)
+- [FastAPI request bodies](https://fastapi.tiangolo.com/tutorial/body/)
+- [pip freeze](https://pip.pypa.io/en/stable/cli/pip_freeze/)
+- [Dockerfile reference](https://docs.docker.com/reference/dockerfile/)

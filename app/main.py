@@ -51,6 +51,8 @@ from .reproducibility.env import (
     get_requirement_pins,
     get_relevant_env_vars,
     get_repo_url,
+    sanitize_env_vars,
+    sanitize_pip_packages,
     write_dockerfile_repro,
     write_environment_yml,
     write_requirements_lock,
@@ -152,10 +154,11 @@ def utc_now() -> str:
 def runtime_environment() -> dict[str, Any]:
     hardware = get_hardware_info()
     installed_requirement_versions = get_installed_requirement_versions(REPO_ROOT)
+    pip_packages = get_pip_freeze() or get_requirement_pins(REPO_ROOT)
     return {
         "python_version": sys.version.split()[0],
         "python_implementation": sys.implementation.name,
-        "pip_packages": get_requirement_pins(REPO_ROOT),
+        "pip_packages": pip_packages,
         "git_commit": get_git_commit(REPO_ROOT),
         "branch": get_git_branch(REPO_ROOT),
         "repo_url": get_repo_url(REPO_ROOT),
@@ -509,7 +512,9 @@ def run_reproducibility_status(folder: Path, manifest: dict[str, Any]) -> str:
     dataset_id = manifest.get("dataset_id")
     dataset_sha = manifest.get("dataset_sha256")
     if dataset_id and dataset_sha:
-        dataset_path = dataset_dir(dataset_id) / "dataset.csv"
+        exported_dataset_manifest = read_json(folder / "dataset_manifest.json") if (folder / "dataset_manifest.json").exists() else {}
+        original_name = exported_dataset_manifest.get("original_name")
+        dataset_path = dataset_dir(dataset_id) / original_name if original_name else dataset_dir(dataset_id) / "dataset.csv"
         if dataset_path.exists() and file_sha256(dataset_path) == dataset_sha:
             return "complete"
     return "partial"
@@ -553,11 +558,21 @@ def replay_artifact_list(folder: Path) -> list[str]:
 
 
 def write_reproducibility_bundle(folder: Path, run_config: Any, run_id: str) -> None:
-    run_config.write_json(folder / "run_config.json")
+    safe_config = run_config.model_copy(deep=True)
+    safe_config.dependencies.pip_packages = sanitize_pip_packages(safe_config.dependencies.pip_packages)
+    safe_config.env_vars = sanitize_env_vars(safe_config.env_vars)
+    if safe_config.environment:
+        safe_config.environment.safe_env_vars = sanitize_env_vars(safe_config.environment.safe_env_vars)
+    safe_config.write_json(folder / "run_config.json")
     write_json(folder / "run_config.schema.json", json_schema())
-    write_requirements_lock(run_config.dependencies.pip_packages, folder, run_id=run_id, python_version=run_config.dependencies.python_version)
-    write_environment_yml(run_config.dependencies.python_version, run_config.dependencies.pip_packages, folder)
-    write_dockerfile_repro(run_config.dependencies.python_version, folder)
+    write_requirements_lock(
+        safe_config.dependencies.pip_packages,
+        folder,
+        run_id=run_id,
+        python_version=safe_config.dependencies.python_version,
+    )
+    write_environment_yml(safe_config.dependencies.python_version, safe_config.dependencies.pip_packages, folder)
+    write_dockerfile_repro(safe_config.dependencies.python_version, folder)
 
 
 app = FastAPI(title="SeqTrainer BenchLab", version="0.1.0")
@@ -765,7 +780,9 @@ def generate_run_config_export(request: BenchmarkPlanRequest) -> dict[str, Any]:
         environment=environment,
         run_manifest=run_manifest,
         repo_root=REPO_ROOT,
-        dataset_path=None if DELETE_DATASETS_AFTER_RUN else str(dataset_dir(request.dataset_id) / "dataset.csv"),
+        dataset_path=None
+        if DELETE_DATASETS_AFTER_RUN
+        else str(dataset_dir(request.dataset_id) / dataset_manifest["original_name"]),
     )
 
     write_reproducibility_bundle(folder, run_config, run_id)
@@ -957,12 +974,14 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "dataset_id": request.dataset_id,
         "dataset_sha256": dataset_manifest["sha256"],
         "seqtrainer_benchlab_version": "0.1.0",
+        "run_mode": "local_benchmark",
         "rows_used": rows_used,
         "row_cap_applied": row_cap_applied,
         "class_balance_applied": class_balance_applied,
         "train_rows": train_rows,
         "test_rows": test_rows,
         "target_kind": "binary_numeric_label" if binary_target else "numeric_regression",
+        "source_dataset_removed_after_run": DELETE_DATASETS_AFTER_RUN,
         "artifact_paths": run_artifact_paths(include_predictions=True),
     }
     run_config = build_run_config(
@@ -973,7 +992,9 @@ def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         environment=environment,
         run_manifest=run_manifest,
         repo_root=REPO_ROOT,
-        dataset_path=None if DELETE_DATASETS_AFTER_RUN else str(dataset_dir(request.dataset_id) / "dataset.csv"),
+        dataset_path=None
+        if DELETE_DATASETS_AFTER_RUN
+        else str(dataset_dir(request.dataset_id) / dataset_manifest["original_name"]),
     )
 
     write_reproducibility_bundle(folder, run_config, run_id)

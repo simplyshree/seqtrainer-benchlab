@@ -210,6 +210,11 @@ Every local run writes artifacts to `storage/runs/<run_id>` when storage is pers
 - `Dockerfile.repro`
 - `environment.yml`
 
+On the Results screen, use **Download Run Config JSON** for the single canonical file, or
+**Export Run Bundle** for the complete ZIP. The Run Config JSON contains dataset checksum,
+resolved settings, model selections, dependency versions, safe environment values, hardware
+details, git metadata, and replay commands.
+
 Uploaded source datasets are deleted automatically after a successful benchmark run by default.
 The run keeps the dataset manifest, metrics, predictions, and configs, but not the uploaded
 raw dataset file. Runtime data is ignored by git.
@@ -255,6 +260,13 @@ POST /api/replay-config
 ```
 
 Send either a raw `run_config.json` object or `{ "dry_run": true, "config": { ... } }`.
+
+Install test dependencies and run the reproducibility tests:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
 
 Run the easy local models from JSON in one command:
 
