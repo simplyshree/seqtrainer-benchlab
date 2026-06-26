@@ -1,119 +1,152 @@
 # SeqTrainer BenchLab
 
-SeqTrainer BenchLab is a local-first web workbench for DNA sequence benchmark runs.
-It wraps the practical capabilities available in the current SeqTrainer main branch:
-dataset loading, sequence preprocessing, k-mer and GC features, simple baselines, metrics,
-predictions, and reproducibility manifests.
+SeqTrainer BenchLab is a local-first web tool for planning and running small DNA sequence
+benchmark experiments. It helps a scientist upload a labeled sequence dataset, inspect the
+data, choose preprocessing and benchmark settings, run lightweight baseline models, and export
+a reproducible `run_config.json` for later Colab, Docker, or HPC work.
 
-This MVP is intended to be run locally, preferably with Docker. It is not designed as a
-shared web service because it has no login system, no per-user isolation, and works with
-uploaded biological datasets.
+This repository is not yet a full hosted model-training platform. It is a practical BenchLab
+MVP: useful for small local checks, reproducibility planning, and producing clear experiment
+configuration files that can be reused in larger workflows.
 
-## What Works Now
+## Current Deliverables
 
-- Upload CSV, TSV, FASTA, FA, or SBOL/XML files
-- Preview and validate sequence datasets
-- Select sequence and target columns for tabular files
-- Generate GC-content and k-mer features
-- Generate optional one-hot features
-- Analyze target labels for class counts and imbalance warnings
-- Generate a reproducible benchmark-plan JSON and Codex prompt for Colab/HPC workflows
-- Run baseline regression models:
+- Local FastAPI web app with beginner and advanced workflow modes.
+- Dataset upload and inspection for CSV, TSV, FASTA/FA, and SBOL/XML inputs.
+- Tabular benchmark support when the file has one sequence column and one numeric label/target column.
+- Dataset summary with row count, detected columns, class counts, and imbalance warnings.
+- Small-run benchmark mode capped at 1000 rows by default for local safety.
+- Baseline model runs using the practical current SeqTrainer-style sklearn options:
   - Linear Regression
   - Random Forest
   - Gradient Boosting
-- Show train/test split size, seed, selected columns, preprocessing config, and data cleanup status after each run
-- Configure split strategy, validation size, reruns, CV folds, training cycles/epochs, early stopping patience, threshold policy, and class balancing
-- For 0/1 labels, report thresholded classification metrics alongside the current-main regression baselines:
+- DNA preprocessing options:
+  - sequence cleanup
+  - GC-content features
+  - k-mer features, default k-mer size `6`
+  - optional one-hot features
+- Benchmark settings for:
+  - split strategy
+  - test and validation size
+  - seed
+  - reruns
+  - CV folds
+  - early stopping patience
+  - threshold policy
+  - class balancing choice
+- Results view with key binary classification metrics when labels are `0/1`:
   - Accuracy
   - Precision
   - Recall
   - F1
   - MCC
-  - Confusion counts
-- Export:
-  - canonical `run_config.json`
-  - metrics
-  - predictions
-  - run manifest
-  - dataset manifest
-  - preprocessing config
-  - training config
-  - benchmark plan JSON
-  - dependency lockfile, JSON schema, Dockerfile.repro, and environment.yml
+  - confusion counts
+- Exportable artifacts:
+  - `run_config.json`
+  - `metrics.json`
+  - `predictions.csv`
+  - `run_manifest.json`
+  - `dataset_manifest.json`
+  - `preprocessing_config.json`
+  - `training_config.json`
+  - `benchmark_plan.json`
+  - `requirements.lock.txt`
+  - `Dockerfile.repro`
+  - `environment.yml`
+  - `run_config.schema.json`
 
-## Benchmark Planning
+## What This Tool Is For
 
-BenchLab has two modes:
+BenchLab is best used as a reproducibility and experiment-planning layer around SeqTrainer-style
+DNA sequence benchmarks.
 
-1. Local small-run mode for quick sklearn baselines.
-2. Planning/export mode for CNN, DNABERT2, and iPro-MP comparison workflows on Colab or HPC.
+Use it to:
 
-The local app is intentionally conservative. If a dataset is larger than 1000 rows, the UI
-warns the scientist and the small-run path uses the first 1000 rows by default. Full-size runs
-should use the exported JSON plan and Codex prompt to create local, Colab, Docker, or HPC
-notebooks.
+- quickly check whether a labeled sequence dataset is usable
+- detect simple class imbalance before training
+- create a consistent benchmark plan before running heavier models
+- run lightweight local baseline models on small datasets
+- export a complete experiment configuration for later replay
+- hand off the same settings to a notebook, Colab session, Docker container, or HPC job
+- compare future model outputs against a recorded benchmark setup
 
-The exported plan records:
+## What This Tool Does Not Do Yet
 
-- raw dataset identity and SHA256
+- It does not train DNABERT2 or iPro-MP inside the web app.
+- It does not provide GPU scheduling or HPC job submission.
+- It does not store raw datasets in `run_config.json`.
+- It does not provide authentication, accounts, or multi-user isolation.
+- It should not be deployed as a public open web service without additional security work.
+- It does not guarantee exact reproduction of GPU drivers or external model checkpoints.
+
+CNN, DNABERT2, and iPro-MP are treated as planned comparison targets in the benchmark planning
+flow. The current local execution path focuses on lightweight baseline models that can run on a
+normal laptop.
+
+## How The JSON Fits In
+
+Every run or exported plan can produce a canonical `run_config.json`.
+
+That file records:
+
+- dataset identity and SHA256 checksum
 - selected sequence and label columns
-- fixed split strategy and materialized split-manifest requirement
-- threshold strategy, including user/literature input, validation MCC, F1, median, or biological goal
-- shared or per-model threshold policy
-- class imbalance summary and optional balancing strategy
-- reruns/seeds, CV folds, and early stopping patience
-- training cycles/epochs for future CNN, DNABERT2, iPro-MP, Docker, Colab, or HPC runners
-- CNN, DNABERT2, and iPro-MP as Colab/HPC comparison targets
-- required artifacts for future reproducibility
+- preprocessing settings
+- split settings and seed
+- threshold policy
+- balancing choice
+- selected models
+- training settings such as reruns, CV folds, cycles, and early stopping
+- Python version and package lock information
+- Docker base image
+- safe environment metadata
+- CPU/GPU hardware summary
+- replay commands and known limitations
 
-The JSON can be reused later to:
+If the same dataset is used again, the checksum helps verify exact replay. If a different
+dataset is uploaded, the JSON should be used as a template: BenchLab can reuse the settings,
+but metrics and predictions must be recalculated for the new data.
 
-- recreate the same split manifest and seeds
-- generate Colab or HPC notebooks from the Codex prompt
-- configure Docker/container runs with the same preprocessing and thresholds
-- compare future model outputs against the same benchmark contract
-- import the plan back into BenchLab or another benchmark tool
-- audit exactly why a threshold, balancing strategy, or row cap was chosen
+## Recommended Workflow
 
-## Future Model Slots
+1. Start BenchLab locally.
+2. Upload a dataset with sequence and label columns.
+3. Review dataset summary and class balance.
+4. Choose beginner mode for simple defaults or advanced mode for split, threshold, CV, and seed settings.
+5. Either run a small local benchmark or skip directly to exporting the run configuration.
+6. Download `run_config.json` or the full run bundle.
+7. Use the JSON later in a local script, notebook, Docker container, Colab, or HPC workflow.
 
-CNN, DNABERT2, and iPro-MP are selectable in the benchmark planning/export section. They are
-not executed inside the local FastAPI app yet. The current upstream repository includes
-DNABERT2 notebooks and experimental GNN code, but the web app only enables the baseline
-sklearn models from the main branch scripts for local execution.
+## Data Format
 
-For binary label datasets, such as `label` values of `0` and `1`, BenchLab still trains the
-current-main sklearn regression baselines. It then applies a `0.5` prediction threshold to
-report classification-style metrics. This keeps the app faithful to the available SeqTrainer
-main-branch model code while making promoter/non-promoter results easier to read.
+For benchmark runs, CSV/TSV files should contain:
 
-## SeqTrainer Integration
+- one DNA sequence column
+- one numeric label/target column, for example `label`, `target`, `y`, or `expression`
 
-This web app is built around the current upstream project at
-https://github.com/SynBioDex/SeqTrainer.
+Example:
 
-The upstream main branch is research-oriented, with reusable kernels in `src/seqtrainer`
-and model workflows in notebooks/scripts. BenchLab uses a local web adapter of those current
-capabilities so the application can run consistently on a scientist's machine:
+```csv
+sequence,label
+ATGCGTACGTAG,1
+TTAACCGGTATA,0
+```
 
-- SBOL/XML sequence extraction mirrors `dataset_builder.get_sequence_from_sbol`
-- numerical SBOL target discovery mirrors `dataset_builder.get_y_label` behavior
-- GC, k-mer, padding, and one-hot feature generation mirror `preprocessing.py`
-- baseline model choices mirror `hpc/sklearn_tuning.py`
+FASTA/FA files are accepted for sequence upload and planning, but they do not contain labels by
+default. A labeled benchmark run needs labels from a tabular file or a compatible metadata source.
 
-DNABERT2 and GNN support are shown as planned because the current upstream implementation is
-not yet packaged as stable API endpoints.
+SBOL/XML parsing is experimental and extracts available sequence/numeric fields when present.
 
-## Quick Start
+## Quick Start With Python
 
-For a short guide you can send to collaborators, see [`docs/intro_manual.md`](docs/intro_manual.md).
+Recommended Python version: `3.11`.
 
-```bash
+```powershell
+cd C:\Users\Sgoff\MYfile\Desktop\PYThh\seqtrainer-benchlab
 py -3.11 -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+.\.venv\Scripts\activate
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Open:
@@ -122,19 +155,17 @@ Open:
 http://127.0.0.1:8000
 ```
 
-## Local Docker Use
+## Quick Start With Docker
 
-Recommended runtime: Docker or Python 3.11.
+Build:
 
-Build the local image:
-
-```bash
+```powershell
 docker build -t seqtrainer-benchlab .
 ```
 
-Run it locally only:
+Run locally:
 
-```bash
+```powershell
 docker run --rm -p 127.0.0.1:8000:8000 seqtrainer-benchlab
 ```
 
@@ -144,146 +175,103 @@ Open:
 http://127.0.0.1:8000
 ```
 
-By default, container storage is temporary. When the container stops, run artifacts inside
-the container are removed. If you deliberately want local persistent artifacts, mount a
-local storage folder:
+To persist run artifacts on your own machine:
 
 ```powershell
 docker run --rm -p 127.0.0.1:8000:8000 -v ${PWD}\storage:/app/storage seqtrainer-benchlab
 ```
 
-Do not bind this app to a public interface or deploy it as an open multi-user website. It is
-intended for local use because uploaded datasets and predictions can contain sensitive
-research data.
+## Replay And Validation
 
-## Local Security Model
+Validate a saved config without training:
 
-BenchLab includes local safety guardrails, but it is still not a hosted multi-user product.
+```powershell
+python -m app.replay --config path\to\run_config.json --dry-run
+```
+
+Run the easy local replay example:
+
+```powershell
+python -m app.reproducibility.run_from_config --config examples\reproducibility\easy_run_config.json --output-dir storage\easy_replay
+```
+
+Beginner notebook:
+
+```text
+notebooks/easy_model_replay_beginner.ipynb
+```
+
+Step-by-step script:
+
+```text
+notebooks/easy_model_replay_steps.py
+```
+
+## HPC Or Colab Use
+
+BenchLab does not run the HPC job for you. It creates the reproducible plan.
+
+Typical HPC/Colab workflow:
+
+1. Export `run_config.json` from BenchLab.
+2. Move `run_config.json` and the dataset to the compute environment.
+3. Validate the config with dry-run mode.
+4. Install dependencies using `requirements.lock.txt`, `environment.yml`, or `Dockerfile.repro`.
+5. Run a notebook or script that reads the JSON and applies the same preprocessing, split, seed,
+   threshold, and model settings.
+6. Save new metrics and predictions as a new result bundle.
+
+On HPC systems that do not allow Docker directly, use Apptainer/Singularity if available.
+
+## Local Security And Data Handling
+
+BenchLab is designed for local use.
 
 - The Docker image runs as a non-root user.
 - Uploaded source datasets are deleted after successful benchmark runs by default.
 - Runtime data under `storage/` is ignored by git and excluded from Docker builds.
-- Dataset and run IDs must be UUIDs, which prevents path traversal through API routes.
 - Uploads are limited to 50 MB by default.
 - Local quick runs are capped at 1000 rows by default.
-- Preprocessing settings are bounded on the backend, including k-mer size and one-hot length.
-- Browser write requests are allowed only from local origins unless explicitly configured.
-- API responses use basic security headers and no-store caching for `/api/*` responses.
+- Dataset and run IDs are UUIDs.
+- Backend preprocessing settings are bounded.
+- Secrets such as tokens, passwords, SMTP credentials, and API keys are excluded from exported configs.
 
-Optional local environment controls:
+Optional environment settings:
 
 ```text
 SEQTRAINER_MAX_UPLOAD_MB=50
 SEQTRAINER_MAX_LOCAL_ROWS=1000
 SEQTRAINER_MAX_KMER_SIZE=6
 SEQTRAINER_MAX_ONE_HOT_LENGTH=1000
-SEQTRAINER_ALLOWED_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+DELETE_DATASETS_AFTER_RUN=true
 ```
 
-## Data Format
-
-CSV/TSV files should contain:
-
-- one sequence column
-- optional numeric target column for benchmark runs, such as `target`, `label`, `y`, or `expression`
-- optional ID column
-
-FASTA/FA files create sequence-only datasets.
-
-SBOL/XML files are parsed for the first `sbol:elements` sequence and available numerical values.
-
-## Reproducibility
-
-Every local run writes artifacts to `storage/runs/<run_id>` when storage is persistent:
-
-- `run_config.json`
-- `metrics.json`
-- `predictions.csv`
-- `run_manifest.json`
-- `dataset_manifest.json`
-- `preprocessing_config.json`
-- `training_config.json`
-- `benchmark_plan.json`
-- `environment.json`
-- `requirements.lock.txt`
-- `run_config.schema.json`
-- `Dockerfile.repro`
-- `environment.yml`
-
-On the Results screen, use **Download Run Config JSON** for the single canonical file, or
-**Export Run Bundle** for the complete ZIP. The Run Config JSON contains dataset checksum,
-resolved settings, model selections, dependency versions, safe environment values, hardware
-details, git metadata, and replay commands.
-
-Uploaded source datasets are deleted automatically after a successful benchmark run by default.
-The run keeps the dataset manifest, metrics, predictions, and configs, but not the uploaded
-raw dataset file. Runtime data is ignored by git.
-
-To keep uploaded datasets during development, set:
-
-```text
-DELETE_DATASETS_AFTER_RUN=false
-```
-
-To wipe local user data, stop the app and delete:
-
-```text
-storage/datasets
-storage/runs
-```
-
-The current repository has been scrubbed of previous local run artifacts and uploaded
-datasets.
-
-## Replaying From JSON
-
-Every benchmark run now writes a canonical `run_config.json`. It combines UI/API inputs,
-dataset checksum, model choices, preprocessing, split settings, threshold policy, dependency
-snapshot, safe environment variables, git metadata, timestamp, and CPU/GPU/CUDA information.
-
-Validate and dry-run a saved config:
+To wipe local runtime data:
 
 ```powershell
-python -m app.reproducibility.run_from_config --config path\to\run_config.json --dry-run
+Remove-Item -Recurse -Force storage\datasets, storage\runs
 ```
 
-Compatibility command:
+Only run this command if you intentionally want to delete local uploaded datasets and run outputs.
 
-```powershell
-python -m app.replay --config path\to\run_config.json --dry-run
-```
+## Development Checks
 
-Dry replay API:
-
-```text
-POST /api/replay-config
-```
-
-Send either a raw `run_config.json` object or `{ "dry_run": true, "config": { ... } }`.
-
-Install test dependencies and run the reproducibility tests:
+Install dev dependencies:
 
 ```powershell
 python -m pip install -r requirements-dev.txt
+```
+
+Run tests:
+
+```powershell
 python -m pytest
 ```
 
-Run the easy local models from JSON in one command:
+Check frontend JavaScript syntax:
 
 ```powershell
-python -m app.reproducibility.run_from_config --config examples\reproducibility\easy_run_config.json --output-dir storage\easy_replay
-```
-
-Notebook-style step-by-step runner:
-
-```text
-notebooks/easy_model_replay_steps.py
-```
-
-Beginner Jupyter notebook:
-
-```text
-notebooks/easy_model_replay_beginner.ipynb
+node --check app\static\app.js
 ```
 
 Export the JSON Schema:
@@ -292,47 +280,45 @@ Export the JSON Schema:
 python -m app.reproducibility.export_schema --output schemas\run_config.schema.json
 ```
 
-Example config:
+## Project Structure
 
 ```text
-examples/run_config.example.json
-examples/reproducibility/run_config.example.json
+app/
+  main.py                     FastAPI routes and local benchmark orchestration
+  static/                     Web UI
+  reproducibility/            run_config schema, builders, replay helpers
+docs/
+  intro_manual.md             Short collaborator-facing usage guide
+  reproducible_runs.md        Details about run_config and replay artifacts
+examples/
+  reproducibility/            Example reproducibility configs
+notebooks/
+  easy_model_replay_beginner.ipynb
+  easy_model_replay_steps.py
+schemas/
+  run_config.schema.json
+tests/
+  test_reproducibility.py
 ```
 
-More detail:
+## Relationship To SeqTrainer
+
+BenchLab is inspired by and aligned with the current upstream SeqTrainer project:
 
 ```text
-docs/reproducible_runs.md
+https://github.com/SynBioDex/SeqTrainer
 ```
 
-Limitations:
+It uses SeqTrainer-style dataset preprocessing and simple baseline benchmarking ideas, adapted
+into a local web workflow. The goal is to make the experiment setup easier for students and
+scientists, then export a reproducible plan that can be used in larger SeqTrainer, notebook,
+Colab, Docker, or HPC workflows.
 
-- Exact GPU driver reproduction is not guaranteed.
-- Raw datasets are not stored in JSON. If `DELETE_DATASETS_AFTER_RUN=true`, full replay is partial until the dataset is restored or re-uploaded.
-- Secrets such as SMTP credentials, API keys, tokens, and passwords are intentionally excluded.
-- CNN, DNABERT2, and iPro-MP remain planned comparison targets unless stable runners are connected.
+## Roadmap
 
-## Email Results
-
-The Results screen can prepare a local email summary and export link.
-
-For optional SMTP delivery on your own machine, configure these environment variables:
-
-```text
-SMTP_HOST
-SMTP_PORT
-SMTP_USERNAME
-SMTP_PASSWORD
-SMTP_FROM
-SMTP_TLS=true
-```
-
-If SMTP is not configured, the app opens a prefilled email draft using the user's mail app.
-
-## Notes
-
-This branch deliberately avoids notebooks and hardcoded research paths. The first goal is a
-stable local tool contract that can later call richer SeqTrainer model backends.
-
-This app does not include authentication, accounts, or multi-user isolation. Keep it local
-unless those features are added.
+- Add stable CNN runner integration.
+- Add DNABERT2 runner integration through notebook/HPC execution first.
+- Add iPro-MP-compatible dataset and inference handoff.
+- Add materialized split manifest creation for raw datasets.
+- Add richer model-comparison reports across repeated seeds.
+- Add optional authenticated deployment mode if the project becomes a hosted service.
