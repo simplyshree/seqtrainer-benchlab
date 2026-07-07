@@ -146,14 +146,27 @@ cd C:\Users\Sgoff\MYfile\Desktop\PYThh\seqtrainer-benchlab
 py -3.11 -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8001
 ```
+
+
+## VS Code Local Run
+
+For this two-mode BenchLab repo, use port `8001` during local development so it does not conflict with any older local checkout that may still be running on port `8000`.
+
+In VS Code:
+
+1. Open this folder: `C:\Users\Sgoff\MYfile\Desktop\PYThh\seqtrainer-benchlab`
+2. Run the task **Run SeqTrainer BenchLab (two-mode UI, port 8001)**.
+3. Open `http://127.0.0.1:8001/`.
+
+The first page should show **Choose Workflow Mode**, **Beginner Student Mode**, and **Advanced Research Mode**.
 
 ## Quick Start With Docker
 
@@ -322,3 +335,4 @@ Colab, Docker, or HPC workflows.
 - Add materialized split manifest creation for raw datasets.
 - Add richer model-comparison reports across repeated seeds.
 - Add optional authenticated deployment mode if the project becomes a hosted service.
+
